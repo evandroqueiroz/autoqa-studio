@@ -1,0 +1,226 @@
+{
+  "id": "60c94624-9a98-4aef-87ce-536d14127a06",
+  "name": "Entrada Manual",
+  "startUrl": "https://eps-dev2.cloud.el.com.br/ServerExec/acessoBase/",
+  "browser": "Chrome",
+  "steps": [
+    {
+      "id": "2a8a9eb5-9a35-4be5-9ce5-4de475353e69",
+      "order": 1,
+      "action": "CLICAR",
+      "field": "Menu Estoque",
+      "value": ""
+    },
+    {
+      "id": "2e47dbc2-3a5e-4c1c-8f42-d32cb8a48b05",
+      "order": 2,
+      "action": "CLICAR",
+      "field": "SubMenu Movimentações",
+      "value": ""
+    },
+    {
+      "id": "7279d9c1-7ff9-400f-be53-30a84630253c",
+      "order": 3,
+      "action": "CLICAR",
+      "field": "SubMenu Entradas em Estoque",
+      "value": ""
+    },
+    {
+      "id": "0e52deec-6e9f-4c1a-bafa-b7e685580eaa",
+      "order": 4,
+      "action": "CLICAR",
+      "field": "Novo",
+      "value": ""
+    },
+    {
+      "id": "a8dcfc30-d554-4696-8984-fb1a696f6c01",
+      "order": 5,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "c060af30-5fb4-47f7-94da-86d7d980b70b",
+      "order": 6,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Almoxarifado",
+      "value": "001"
+    },
+    {
+      "id": "8cb951f8-d449-4ea6-b430-7c345bf36df7",
+      "order": 7,
+      "action": "VALIDAR_TEXTO",
+      "field": "Data Almoxarifado",
+      "value": "{HOJE}",
+      "condition": "CONTEM"
+    },
+    {
+      "id": "723b6ae4-8c6c-4e6f-8fe0-5a85bad1be09",
+      "order": 8,
+      "action": "VALIDAR_PREENCHIMENTO",
+      "field": "Número Entrada",
+      "value": ""
+    },
+    {
+      "id": "1ca0af7c-ffa0-4701-b8ce-ec1f5bd42520",
+      "order": 9,
+      "action": "VALIDAR_DESABILITADO",
+      "field": "Ano Entrada",
+      "value": ""
+    },
+    {
+      "id": "f660644a-6db3-41f0-a8df-71a95737f5f0",
+      "order": 10,
+      "action": "VALIDAR_TEXTO",
+      "field": "Ano Entrada",
+      "value": "2025",
+      "condition": "IGUAL"
+    },
+    {
+      "id": "31366643-2c0c-43a6-a99d-9150e3ec5c4e",
+      "order": 11,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Fornecedor Entrada",
+      "value": "0006873"
+    },
+    {
+      "id": "1a5df95c-f285-45fb-af0f-c171630fdddf",
+      "order": 12,
+      "action": "VALIDAR_TEXTO",
+      "field": "Espécie Doc",
+      "value": "Nota Fiscal",
+      "condition": "CONTEM"
+    },
+    {
+      "id": "cb649e4d-7e69-446b-a3f5-8b7ed9935344",
+      "order": 13,
+      "action": "DIGITAR",
+      "field": "Número Doc",
+      "value": "{ALEATORIO_NUM}"
+    },
+    {
+      "id": "a20b8399-4c25-423e-9bc2-53df36cf7d06",
+      "order": 14,
+      "action": "VALIDAR_TEXTO",
+      "field": "Data Doc",
+      "value": "{HOJE}",
+      "condition": "CONTEM"
+    },
+    {
+      "id": "878aa282-d9da-4159-9f57-5bd401cb2e0b",
+      "order": 15,
+      "action": "DIGITAR",
+      "field": "Histórico Entrada",
+      "value": "Teste Realizado com Selenium"
+    },
+    {
+      "id": "917aa95e-b817-434c-80d5-8aecef30d89e",
+      "order": 16,
+      "action": "VALIDAR_DESABILITADO",
+      "field": "Campo Autorização (AF)",
+      "value": ""
+    },
+    {
+      "id": "d32960b5-9584-4095-8bab-e893debdf7b9",
+      "order": 17,
+      "action": "CLICAR",
+      "field": "Salvar",
+      "value": ""
+    },
+    {
+      "id": "7e04e70b-b09f-4eca-bafd-4ef2d390c471",
+      "order": 18,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "dbed9af8-3e6f-4c20-87a9-81fb72f4932e",
+      "order": 19,
+      "action": "CLICAR",
+      "field": "Novo",
+      "value": ""
+    },
+    {
+      "id": "684460d9-a1ff-4f56-91bf-b56f53bcc296",
+      "order": 20,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "de118d8d-8d71-447f-8b68-ba501afa9dde",
+      "order": 21,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Item",
+      "value": "00013973"
+    },
+    {
+      "id": "9de6fdf8-cbc1-41e1-92b9-bea6521b8171",
+      "order": 22,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Classificação",
+      "value": "00001"
+    },
+    {
+      "id": "eebc6e0c-fd12-4e5f-a171-192f3dd79aba",
+      "order": 23,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Lote",
+      "value": "Teste 31/12"
+    },
+    {
+      "id": "ee05495e-1dbe-48b4-b1d8-a444b1b863fe",
+      "order": 24,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Endereço",
+      "value": "00000000.00010262"
+    },
+    {
+      "id": "d6883f38-0dae-4c91-a74f-204980c15cee",
+      "order": 25,
+      "action": "DIGITAR",
+      "field": "Quantidade",
+      "value": "10"
+    },
+    {
+      "id": "4427c0e4-6b9d-4859-be60-671e96df11ba",
+      "order": 26,
+      "action": "DIGITAR",
+      "field": "Unitário",
+      "value": "5"
+    },
+    {
+      "id": "78b004ad-2a60-4d47-909c-3bbacf1f65f5",
+      "order": 27,
+      "action": "VALIDAR_TEXTO",
+      "field": "Total",
+      "value": "50,00",
+      "condition": "IGUAL"
+    },
+    {
+      "id": "4dc644cb-46a6-4dfd-9ef2-e5e8c9f20311",
+      "order": 28,
+      "action": "CLICAR",
+      "field": "Salvar e Fechar",
+      "value": ""
+    },
+    {
+      "id": "8c55ce6d-0862-4f44-873f-46d795a684c9",
+      "order": 29,
+      "action": "CLICAR",
+      "field": "Fechar",
+      "value": ""
+    },
+    {
+      "id": "54cfa75c-89c7-403a-82c9-f7c1d836e0e7",
+      "order": 30,
+      "action": "CLICAR",
+      "field": "",
+      "value": ""
+    }
+  ],
+  "folderId": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",
+  "persistSession": false,
+  "useSession": true
+}

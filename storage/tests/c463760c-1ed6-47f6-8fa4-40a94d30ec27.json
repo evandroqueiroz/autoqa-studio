@@ -1,0 +1,110 @@
+{
+  "id": "c463760c-1ed6-47f6-8fa4-40a94d30ec27",
+  "name": "Processo",
+  "startUrl": "",
+  "browser": "Chrome",
+  "steps": [
+    {
+      "id": "bb389e46-e259-4cb0-a647-758aae93ba0d",
+      "order": 1,
+      "action": "CLICAR",
+      "field": "Menu Protocolo",
+      "value": ""
+    },
+    {
+      "id": "c8aa07f2-2f1d-4cf7-b5fe-9a46bf2f83b1",
+      "order": 2,
+      "action": "CLICAR",
+      "field": "SubMenu Registro",
+      "value": ""
+    },
+    {
+      "id": "2179b80a-fedb-4016-a4f2-45b72c2f0b39",
+      "order": 3,
+      "action": "CLICAR",
+      "field": "SubMenu Processos",
+      "value": ""
+    },
+    {
+      "id": "fd7110f0-fb49-4943-aea0-1880abb90f45",
+      "order": 4,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "c71b30ad-632d-4202-93df-9d90a4d9c3a3",
+      "order": 5,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Assunto",
+      "value": "001.00025"
+    },
+    {
+      "id": "e623c27e-3e98-450d-8d23-a0d185bf37c6",
+      "order": 6,
+      "action": "VALIDAR_DESABILITADO",
+      "field": "Número ECM",
+      "value": ""
+    },
+    {
+      "id": "555d29f6-45d8-467e-b146-cf439e6035f0",
+      "order": 7,
+      "action": "VALIDAR_TEXTO",
+      "field": "Ano ECM",
+      "value": "2025",
+      "condition": "IGUAL"
+    },
+    {
+      "id": "cadd6efa-409c-48ed-98c1-b181049da6d0",
+      "order": 8,
+      "action": "DIGITAR",
+      "field": "Detalhamento ECM",
+      "value": "Teste de Processo com Selenium"
+    },
+    {
+      "id": "4965cb4a-ed0b-4e68-b475-202fa2e8743f",
+      "order": 9,
+      "action": "CLICAR",
+      "field": "Aba Info Adicionais",
+      "value": ""
+    },
+    {
+      "id": "f38f2f78-d0ed-45a1-a719-25510b008c56",
+      "order": 10,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Origem",
+      "value": "0018354"
+    },
+    {
+      "id": "daf227ca-0785-4d71-9e2b-fc336d85f963",
+      "order": 11,
+      "action": "DIGITAR",
+      "field": "Palavras Chave",
+      "value": "Teste Palavra Chave com Selenium"
+    },
+    {
+      "id": "16a81e5e-1325-4126-a40e-c8e5164fd24c",
+      "order": 12,
+      "action": "DIGITAR",
+      "field": "Emissão",
+      "value": "29/12/2025"
+    },
+    {
+      "id": "ab8c01a8-b83b-4fa6-bb64-b1a6c77a0683",
+      "order": 13,
+      "action": "DIGITAR",
+      "field": "Vencimento",
+      "value": "{HOJE}"
+    },
+    {
+      "id": "413237c7-d2d2-4601-83ea-28fe678ba0fb",
+      "order": 14,
+      "action": "CLICAR",
+      "field": "Salvar Processo",
+      "value": ""
+    }
+  ],
+  "folderId": "67f76176-0299-4ded-9f0d-4f40b64da82d",
+  "persistSession": false,
+  "useSession": true
+}

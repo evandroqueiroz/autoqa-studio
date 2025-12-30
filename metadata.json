@@ -1,0 +1,5 @@
+{
+  "name": "AutoQA Studio",
+  "description": "A visual, no-code Selenium test runner and editor for QA analysts. Features a test step editor, visual execution simulation, and log console.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,86 @@
+{
+  "testCases": [
+    {
+      "id": "test-1",
+      "name": "Cenário: Login e Acesso Principal",
+      "startUrl": "https://eps-dev.cloud.el.com.br/ServerExec/acessoBase/",
+      "browser": "Chrome",
+      "steps": [
+        {
+          "id": "step-1",
+          "order": 1,
+          "action": "DIGITAR",
+          "field": "Campo Usuário",
+          "value": "evandro.queiroz"
+        },
+        {
+          "id": "step-2",
+          "order": 2,
+          "action": "DIGITAR",
+          "field": "Campo Senha",
+          "value": "200%Smart"
+        },
+        {
+          "id": "step-3",
+          "order": 3,
+          "action": "CLICAR",
+          "field": "Botão Entrar",
+          "value": ""
+        },
+        {
+          "id": "step-4",
+          "order": 4,
+          "action": "ESPERAR",
+          "field": "",
+          "value": "2000"
+        }
+      ]
+    }
+  ],
+  "elementMap": [
+    {
+      "friendlyName": "Botão Cookies",
+      "selector": "//button[contains(., 'Aceitar') or contains(., 'Concordar')]",
+      "type": "button",
+      "by": "xpath",
+      "category": "Geral"
+    },
+    {
+      "friendlyName": "Campo Usuário",
+      "selector": "[tid=\"login_usuario\"]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Campo Senha",
+      "selector": "[tid=\"login_senha\"]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Botão Entrar",
+      "selector": "[tid=\"login_btn_entrar_prosseguir\"]",
+      "type": "button",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Botão Fechar",
+      "selector": "//button[contains(., 'Fechar')]",
+      "type": "button",
+      "category": "Modais"
+    },
+    {
+      "friendlyName": "Menu Lateral",
+      "selector": ".menu-container",
+      "type": "button",
+      "category": "Navegação"
+    },
+    {
+      "friendlyName": "Título da Home",
+      "selector": "h1.page-title",
+      "type": "text",
+      "category": "Home"
+    }
+  ],
+  "folders": []
+}

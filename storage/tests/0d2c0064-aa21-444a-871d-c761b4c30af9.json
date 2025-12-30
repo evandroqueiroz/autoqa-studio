@@ -1,0 +1,74 @@
+{
+  "id": "0d2c0064-aa21-444a-871d-c761b4c30af9",
+  "name": "ECM",
+  "startUrl": "https://eps-dev2.cloud.el.com.br/ServerExec/acessoBase/",
+  "browser": "Chrome",
+  "steps": [
+    {
+      "id": "76485627-ddcd-46d7-86fc-a8f457f3fa2f",
+      "order": 1,
+      "action": "CLICAR",
+      "field": "Menu ECM",
+      "value": ""
+    },
+    {
+      "id": "dedb5b4f-9aa7-4a97-a0bd-b128a0ffcb85",
+      "order": 2,
+      "action": "CLICAR",
+      "field": "SubMenu Indexação",
+      "value": ""
+    },
+    {
+      "id": "5e721c43-2fd0-46eb-99f2-0afdfd0d326f",
+      "order": 3,
+      "action": "CLICAR",
+      "field": "SubMenu ECM Digital",
+      "value": ""
+    },
+    {
+      "id": "943329d8-3f37-425e-91df-05597269d8cc",
+      "order": 4,
+      "action": "CLICAR",
+      "field": "Novo ECM",
+      "value": ""
+    },
+    {
+      "id": "00cc64dc-37b4-4d3c-ba99-7fbdcda90187",
+      "order": 5,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Assunto",
+      "value": "002.00037"
+    },
+    {
+      "id": "6eaa6883-f141-41a3-8d27-1f646d1e1c83",
+      "order": 6,
+      "action": "CLICAR",
+      "field": "Aba Info Adicionais",
+      "value": ""
+    },
+    {
+      "id": "7cf5df21-dd74-4ff1-a4fe-51e558dd63b2",
+      "order": 7,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Origem",
+      "value": "0018354"
+    },
+    {
+      "id": "ef7c6e5e-e35a-4eef-a093-2e5c6a612df3",
+      "order": 8,
+      "action": "CLICAR",
+      "field": "Salvar ECM",
+      "value": ""
+    },
+    {
+      "id": "ce6d8922-708b-4e54-8794-c4654f0d005e",
+      "order": 9,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    }
+  ],
+  "persistSession": false,
+  "useSession": true,
+  "folderId": "67f76176-0299-4ded-9f0d-4f40b64da82d"
+}

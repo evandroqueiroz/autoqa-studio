@@ -1,0 +1,52 @@
+{
+  "id": "test-1",
+  "name": "Login",
+  "startUrl": "https://eps-dev2.cloud.el.com.br/ServerExec/acessoBase/",
+  "browser": "Chrome",
+  "steps": [
+    {
+      "id": "step-1",
+      "order": 1,
+      "action": "DIGITAR",
+      "field": "Campo Usuário",
+      "value": "evandro.queiroz"
+    },
+    {
+      "id": "step-2",
+      "order": 2,
+      "action": "DIGITAR",
+      "field": "Campo Senha",
+      "value": "200%Smart"
+    },
+    {
+      "id": "step-3",
+      "order": 3,
+      "action": "CLICAR",
+      "field": "Botão Entrar",
+      "value": ""
+    },
+    {
+      "id": "step-4",
+      "order": 4,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "958cb6e3-9003-4a0b-9ce1-9cd8e46fa3ea",
+      "order": 5,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Dropdown Cliente",
+      "value": "Prefeitura Municipal de Pedro Canário"
+    },
+    {
+      "id": "6fc620d9-9931-4e1c-ae06-17cf5f9649aa",
+      "order": 6,
+      "action": "CLICAR",
+      "field": "Fechar Info",
+      "value": ""
+    }
+  ],
+  "persistSession": true,
+  "folderId": "0b4ce6af-3be8-4618-9aa4-5c4d4aa02bbb"
+}

@@ -1,0 +1,90 @@
+{
+  "id": "21d0f253-7703-4f7c-831a-22f3021dd5ca",
+  "name": "Saída Manual",
+  "startUrl": "https://eps-dev2.cloud.el.com.br/ServerExec/acessoBase/",
+  "browser": "Chrome",
+  "steps": [
+    {
+      "id": "f56f615d-402f-4373-9b9c-26a7262313cb",
+      "order": 1,
+      "action": "CLICAR",
+      "field": "Menu Estoque",
+      "value": ""
+    },
+    {
+      "id": "30fba172-b1bb-49c1-807c-f5925e5c6758",
+      "order": 2,
+      "action": "CLICAR",
+      "field": "SubMenu Movimentações",
+      "value": ""
+    },
+    {
+      "id": "44c2cf2b-7233-4352-913d-2d4b877424fd",
+      "order": 3,
+      "action": "CLICAR",
+      "field": "SubMenu Saída em Estoque",
+      "value": ""
+    },
+    {
+      "id": "ca884d25-9656-41e2-8a92-d06798a565f8",
+      "order": 4,
+      "action": "CLICAR",
+      "field": "Novo",
+      "value": ""
+    },
+    {
+      "id": "9b593c0b-cba3-458a-9c79-b4ee6c7b761d",
+      "order": 5,
+      "action": "ESPERAR",
+      "field": "",
+      "value": "2000"
+    },
+    {
+      "id": "436d94ac-9ec2-4077-9f82-1e35f4850d46",
+      "order": 6,
+      "action": "DIGITAR_E_SELECIONAR",
+      "field": "Almoxarifado Saída",
+      "value": "001"
+    },
+    {
+      "id": "6d648ef3-b5c2-448f-afd3-d10ba2fac5b5",
+      "order": 7,
+      "action": "VALIDAR_TEXTO",
+      "field": "Data Saída",
+      "value": "{HOJE}",
+      "condition": "CONTEM"
+    },
+    {
+      "id": "3d5f7977-d27c-41c4-b6a4-4e6ebea88852",
+      "order": 8,
+      "action": "VALIDAR_PREENCHIMENTO",
+      "field": "Número Saída",
+      "value": ""
+    },
+    {
+      "id": "8059b5ed-a735-4522-8c8f-d2f5fbc77791",
+      "order": 9,
+      "action": "VALIDAR_TEXTO",
+      "field": "Ano Saída",
+      "value": "2025",
+      "condition": "IGUAL"
+    },
+    {
+      "id": "fd60f5a4-e353-47a9-8710-a58ba8446147",
+      "order": 10,
+      "action": "DIGITAR",
+      "field": "Histórico Saída",
+      "value": "Teste de saída com Selenium"
+    },
+    {
+      "id": "6487a3a5-5828-4037-8f2f-bacb9e873c92",
+      "order": 11,
+      "action": "CLICAR",
+      "field": "Salvar",
+      "value": ""
+    }
+  ],
+  "folderId": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",
+  "persistSession": false,
+  "useSession": true
+}

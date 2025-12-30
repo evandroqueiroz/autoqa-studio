@@ -1,0 +1,469 @@
+{
+  "elementMap": [
+    {
+      "friendlyName": "Botão Cookies",
+      "selector": "",
+      "type": "button",
+      "by": "xpath",
+      "category": "Geral"
+    },
+    {
+      "friendlyName": "Campo Usuário",
+      "selector": "[tid=\"login_usuario\"]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Campo Senha",
+      "selector": "[tid=\"login_senha\"]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Botão Entrar",
+      "selector": "[tid=\"login_btn_entrar_prosseguir\"]",
+      "type": "button",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Botão Fechar",
+      "selector": "//button[contains(., 'Fechar')]",
+      "type": "button",
+      "category": "Modais"
+    },
+    {
+      "friendlyName": "Menu Lateral",
+      "selector": ".menu-container",
+      "type": "button",
+      "category": "Navegação"
+    },
+    {
+      "friendlyName": "Título da Home",
+      "selector": "h1.page-title",
+      "type": "text",
+      "category": "Home"
+    },
+    {
+      "friendlyName": "Menu ECM",
+      "selector": "[tid=\"acesso_navegacao_D9D4F495E875A2E075A1A4A6E1B9770F\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "SubMenu Indexação",
+      "selector": "[tid=\"acesso_navegacao_6364D3F0F495B6AB9DCF8D3B5C6E0B01\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "SubMenu ECM Digital",
+      "selector": "[tid=\"acesso_navegacao_BAC5094284272093DBE78B0EA67252D1\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Novo ECM",
+      "selector": "[tid=\"rbNovo\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Assunto",
+      "selector": "[tid=\"ggAssuntoCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Aba Info Adicionais",
+      "selector": "[tid=\"tabComplemento\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Origem",
+      "selector": "[tid=\"containerOrigem\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Salvar ECM",
+      "selector": "[tid=\"btnSalvar\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Dropdown Cliente",
+      "selector": "[tid=\"login_clientes\"]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Menu Estoque",
+      "selector": "[tid=\"acesso_navegacao_FAEAC4E1EEF307C2AB7B0A3821E6C667\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "SubMenu Movimentações",
+      "selector": "[tid=\"acesso_navegacao_C16A5320FA475530D9583C34FD356EF5\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "SubMenu Entradas em Estoque",
+      "selector": "[tid=\"acesso_navegacao_F9FA3DF284511B4C836773F438D3F4A8\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Novo",
+      "selector": "[tid=\"btnIncluir\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Almoxarifado",
+      "selector": "[tid=\"AlEntrada.alAlmoxarifado\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Data Almoxarifado",
+      "selector": "[tid=\"AlEntrada.dataEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Número Entrada",
+      "selector": "[tid=\"AlEntrada.numeroEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Ano Entrada",
+      "selector": "[tid=\"AlEntrada.anoEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Fornecedor Entrada",
+      "selector": "[tid=\"AlEntrada.ggFornecedor\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Espécie Doc",
+      "selector": "[tid=\"AlEntrada.ggEcmEspecie\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Número Doc",
+      "selector": "[tid=\"AlEntrada.numeroDocumentoEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Data Doc",
+      "selector": "[tid=\"AlEntrada.dataDocumentoEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Ocorrência",
+      "selector": "[tid=\"AlEntrada.ggOcorrencia\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Histórico Entrada",
+      "selector": "[tid=\"AlEntrada.historicoEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Campo Autorização (AF)",
+      "selector": "[tid=\"AlEntrada.cpAutorizacaoByIdAutorizacao\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Salvar",
+      "selector": "[tid=\"btnSalvar\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Fechar Info",
+      "selector": "//button[contains(., 'Fechar')]",
+      "type": "input",
+      "category": "Página de Login"
+    },
+    {
+      "friendlyName": "Menu Protocolo",
+      "selector": "[tid=\"acesso_navegacao_96A3BE3CF272E017046D1B2674A52BD3\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "SubMenu Registro",
+      "selector": "[tid=\"acesso_navegacao_6F4922F45568161A8CDF4AD2299F6D23\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "SubMenu Processos",
+      "selector": "[tid=\"acesso_navegacao_A060F9048CCE5449AB8C8BE99DDA4F8B\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Espécie",
+      "selector": "[tid=\"ggEcmEspecieCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Número ECM",
+      "selector": "[tid=\"numeroEcmCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Ano ECM",
+      "selector": "[tid=\"anoEcmCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Detalhamento ECM",
+      "selector": "[tid=\"resumoEcmCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Contato",
+      "selector": "[tid=\"containerContato\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Visibilidade",
+      "selector": "[tid=\"dicVisibilidadeCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Interno/Externo",
+      "selector": "[tid=\"dicInternoExternoCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Área/Setor",
+      "selector": "[tid=\"areaSetorCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Prioridade",
+      "selector": "[tid=\"dicPrioridadeCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Composição",
+      "selector": "[tid=\"dicArquivoComposicaoCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Palavras Chave",
+      "selector": "[tid=\"palavraChavePesquisaCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Emissão",
+      "selector": "[tid=\"dataEmissaoEcmCtrl\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Vencimento",
+      "selector": "[tid=\"dataVencimentoEcmContainer\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Salvar Processo",
+      "selector": "[tid=\"btnSalvar\"]",
+      "type": "input",
+      "category": "ECM"
+    },
+    {
+      "friendlyName": "Item",
+      "selector": "[tid=\"AlEntradaItem.ggItemXUnidade\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Classificação",
+      "selector": "[tid=\"AlEntradaItem.alClassificacao\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Lote",
+      "selector": "[tid=\"AlEntradaItem.alLote\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Endereço",
+      "selector": "[tid=\"AlEntradaItem.alEnderecoFisico\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Quantidade",
+      "selector": "[tid=\"AlEntradaItem.quantidadeEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Unitário",
+      "selector": "[tid=\"AlEntradaItem.unitarioEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Total",
+      "selector": "[tid=\"AlEntradaItem.totalEntrada\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Salvar e Fechar",
+      "selector": "[tid=\"btnSalvarFechar\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Entradas em Estoque (NOTA)",
+      "selector": "[tid=\"AlEntrada.btnAssoc.EntradasemEstoque\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Opções",
+      "selector": "[tid=\"btnMenuOpcoes\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Saída Automática",
+      "selector": "[tid=\"btnMenuOpcoes0\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Fechar",
+      "selector": "[tid=\"btnFecharCastata\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "SubMenu Saída em Estoque",
+      "selector": "[tid=\"acesso_navegacao_4DDB45FA7490C927BA229ACFE0E58E6F\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Almoxarifado Saída",
+      "selector": "[tid=\"AlSaida.alAlmoxarifado\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Data Saída",
+      "selector": "[tid=\"AlSaida.dataSaida\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Número Saída",
+      "selector": "[tid=\"AlSaida.numeroSaida\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Ano Saída",
+      "selector": "[tid=\"AlSaida.anoSaida\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Histórico Saída",
+      "selector": "[tid=\"AlSaida.historicoSaida\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "SubMenu Solicitação de Transferência de Estoque",
+      "selector": "[tid=\"acesso_navegacao_45c9c503-839b-4ff4-83fe-e6279958022d\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Data Transferência",
+      "selector": "[tid=\"AlTransferencia.dataTransferencia\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Número Transferência",
+      "selector": "[tid=\"AlTransferencia.numeroTransferencia\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Ano Transferência",
+      "selector": "[tid=\"AlTransferencia.anoTransferencia\"]",
+      "type": "input",
+      "category": "Estoque"
+    },
+    {
+      "friendlyName": "Ano Sol. Transferência",
+      "selector": "[tid=\"AlTransferencia.anoTransferencia\"]",
+      "type": "input",
+      "category": "Estoque"
+    }
+  ],
+  "folders": [
+    {
+      "id": "0b4ce6af-3be8-4618-9aa4-5c4d4aa02bbb",
+      "name": "Login",
+      "isExpanded": false
+    },
+    {
+      "id": "67f76176-0299-4ded-9f0d-4f40b64da82d",
+      "name": "ECM",
+      "isExpanded": false
+    },
+    {
+      "id": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",
+      "name": "Estoque",
+      "isExpanded": true
+    }
+  ],
+  "testOrder": [
+    "c463760c-1ed6-47f6-8fa4-40a94d30ec27",
+    "0d2c0064-aa21-444a-871d-c761b4c30af9",
+    "test-1",
+    "60c94624-9a98-4aef-87ce-536d14127a06",
+    "21d0f253-7703-4f7c-831a-22f3021dd5ca",
+    "6925f0f5-9530-4808-9a2f-db1ed0fe5495"
+  ],
+  "baseUrl": "https://eps-dev2.cloud.el.com.br/ServerExec/acessoBase/"
+}
