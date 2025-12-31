@@ -211,13 +211,6 @@
       "action": "CLICAR",
       "field": "Fechar",
       "value": ""
-    },
-    {
-      "id": "54cfa75c-89c7-403a-82c9-f7c1d836e0e7",
-      "order": 30,
-      "action": "CLICAR",
-      "field": "",
-      "value": ""
     }
   ],
   "folderId": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",

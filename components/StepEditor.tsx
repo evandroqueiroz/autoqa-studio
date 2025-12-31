@@ -227,11 +227,26 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     onUpdateSteps(newSteps);
   };
 
-  const updateSelector = (friendlyName: string, newSelector: string) => {
-    const newMap = elementMap.map(el =>
+  const updateOrCreateSelector = (friendlyName: string, newSelector: string) => {
+    if (!friendlyName) return;
+
+    const exists = elementMap.find(el => el.friendlyName === friendlyName);
+
+    if (exists) {
+      const newMap = elementMap.map(el =>
         el.friendlyName === friendlyName ? { ...el, selector: newSelector } : el
-    );
-    onUpdateElementMap(newMap);
+      );
+      onUpdateElementMap(newMap);
+    } else {
+      // Create new entry
+      const newElement: PageElement = {
+        friendlyName: friendlyName,
+        selector: newSelector,
+        type: 'input',
+        category: 'Geral'
+      };
+      onUpdateElementMap([...elementMap, newElement]);
+    }
   };
 
   // --- Drag and Drop Handlers ---
@@ -290,18 +305,6 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     return action === ActionType.VALIDATE_TEXT || action === ActionType.WAIT_FOR;
   };
 
-  // Group elements by category
-  const groupedElements = elementMap.reduce((acc, el) => {
-    const category = el.category || 'Geral';
-    if (!acc[category]) {
-      acc[category] = [];
-    }
-    acc[category].push(el);
-    return acc;
-  }, {} as Record<string, PageElement[]>);
-
-  const sortedCategories = Object.keys(groupedElements).sort();
-
   const headers = [
     { label: '', index: 0 }, // Checkbox Column
     { label: '#', index: 1 },
@@ -314,369 +317,333 @@ export const StepEditor: React.FC<StepEditorProps> = ({
   ];
 
   return (
-      <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
-        <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
-          <div className="flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
-            <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fluxo de Passos</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            {clipboardCount > 0 && (
-                <button
-                    onClick={handlePaste}
-                    className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm"
-                    title={`Colar ${clipboardCount} passos`}
-                >
-                  <Clipboard size={14} /> Colar ({clipboardCount})
-                </button>
-            )}
-
-            <button
-                onClick={() => setShowHelp(true)}
-                className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
-                title="Variáveis "
-            >
-              <Info size={18} />
-            </button>
-            <button
-                onClick={addStep}
-                className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
-            >
-              <Plus size={16} strokeWidth={3} /> Adicionar Passo
-            </button>
-          </div>
+    <div className="flex flex-col h-full bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden relative">
+      <div className="flex items-center justify-between px-6 py-4 bg-slate-50 border-b border-slate-200">
+        <div className="flex items-center gap-2">
+          <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
+          <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Fluxo de Passos</h3>
         </div>
+        <div className="flex items-center gap-2">
+          {clipboardCount > 0 && (
+            <button
+              onClick={handlePaste}
+              className="flex items-center gap-2 px-3 py-1.5 text-[10px] font-bold text-slate-600 bg-white border border-slate-200 rounded-lg hover:border-blue-300 hover:text-blue-600 transition-colors shadow-sm"
+              title={`Colar ${clipboardCount} passos`}
+            >
+              <Clipboard size={14} /> Colar ({clipboardCount})
+            </button>
+          )}
 
-        <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
-          <table className="w-full text-left text-xs border-collapse table-fixed">
-            <thead className="bg-white text-slate-400 font-bold uppercase tracking-widest sticky top-0 z-10 border-b border-slate-100 shadow-sm">
-            <tr>
-              {headers.map((h) => (
-                  <th key={h.index} style={{ width: colWidths[h.index] }} className="px-2 py-4 relative group select-none">
-                    {h.index === 0 ? (
-                        <div className="flex justify-center">
-                          <button onClick={toggleSelectAll} className="hover:text-blue-500 transition-colors">
-                            {selectedSteps.size > 0 && selectedSteps.size === steps.length
-                                ? <CheckSquare size={16} className="text-blue-500"/>
-                                : <Square size={16} />}
-                          </button>
-                        </div>
-                    ) : (
-                        <>
-                          <div className="px-1 truncate">{h.label}</div>
-                          <div
-                              onMouseDown={(e) => startResize(h.index, e)}
-                              className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 transition-colors z-20 flex items-center justify-center group-hover:bg-slate-200"
-                          >
-                            <div className="h-4 w-[1px] bg-slate-300 opacity-0 group-hover:opacity-100" />
-                          </div>
-                        </>
-                    )}
-                  </th>
-              ))}
-              <th className="px-4 py-4 w-24 text-right">Ações</th>
-            </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-            {steps.map((step, index) => {
-              const element = elementMap.find(e => e.friendlyName === step.field);
-              const isKnownElement = !!element;
-              const isWaitAction = step.action === ActionType.WAIT;
-              const isWaitFor = step.action === ActionType.WAIT_FOR;
-              const isDisabledCheck = step.action === ActionType.VALIDATE_DISABLED || step.action === ActionType.CLICK;
-              const isSelected = selectedSteps.has(step.id);
+          <button
+            onClick={() => setShowHelp(true)}
+            className="p-2 text-slate-400 hover:text-blue-500 hover:bg-blue-50 rounded-full transition-colors"
+            title="Variáveis"
+          >
+            <Info size={18} />
+          </button>
+          <button
+            onClick={addStep}
+            className="flex items-center gap-2 px-4 py-2 text-xs font-bold text-white bg-blue-600 rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-500/20 transition-all active:scale-95"
+          >
+            <Plus size={16} strokeWidth={3} /> Adicionar Passo
+          </button>
+        </div>
+      </div>
 
-              const showCondition = shouldShowCondition(step.action);
+      <div className="flex-1 overflow-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
+        <table className="w-full text-left text-xs border-collapse table-fixed">
+          <thead className="bg-white text-slate-400 font-bold uppercase tracking-widest sticky top-0 z-10 border-b border-slate-100 shadow-sm">
+          <tr>
+            {headers.map((h) => (
+              <th key={h.index} style={{ width: colWidths[h.index] }} className="px-2 py-4 relative group select-none">
+                {h.index === 0 ? (
+                  <div className="flex justify-center">
+                    <button onClick={toggleSelectAll} className="hover:text-blue-500 transition-colors">
+                      {selectedSteps.size > 0 && selectedSteps.size === steps.length
+                        ? <CheckSquare size={16} className="text-blue-500"/>
+                        : <Square size={16} />}
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="px-1 truncate">{h.label}</div>
+                    <div
+                      onMouseDown={(e) => startResize(h.index, e)}
+                      className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-400 transition-colors z-20 flex items-center justify-center group-hover:bg-slate-200"
+                    >
+                      <div className="h-4 w-[1px] bg-slate-300 opacity-0 group-hover:opacity-100" />
+                    </div>
+                  </>
+                )}
+              </th>
+            ))}
+            <th className="px-4 py-4 w-24 text-right">Ações</th>
+          </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+          {steps.map((step, index) => {
+            const element = elementMap.find(e => e.friendlyName === step.field);
+            const isKnownElement = !!element;
+            const isWaitAction = step.action === ActionType.WAIT;
+            const isWaitFor = step.action === ActionType.WAIT_FOR;
+            const isDisabledCheck = step.action === ActionType.VALIDATE_DISABLED || step.action === ActionType.CLICK; // AGORA INCLUI CLICK
+            const isSelected = selectedSteps.has(step.id);
 
-              // Lógica de Separação TID / CSS
-              const rawSelector = element?.selector || '';
-              const tidMatch = rawSelector.match(/^\[tid="(.+)"\]$/);
-              const currentTid = tidMatch ? tidMatch[1] : '';
-              const currentCss = tidMatch ? '' : rawSelector;
+            const showCondition = shouldShowCondition(step.action);
 
-              return (
-                  <tr
-                      key={step.id}
-                      draggable="true"
-                      onDragStart={(e) => handleDragStart(e, index)}
-                      onDragOver={(e) => handleDragOver(e, index)}
-                      onDrop={(e) => handleDrop(e, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`hover:bg-blue-50/30 transition-colors group/row relative
+            // Lógica de Separação TID / CSS
+            const rawSelector = element?.selector || '';
+            const tidMatch = rawSelector.match(/^\[tid="(.+)"\]$/);
+            const currentTid = tidMatch ? tidMatch[1] : '';
+            const currentCss = tidMatch ? '' : rawSelector;
+
+            return (
+              <tr
+                key={step.id}
+                draggable="true"
+                onDragStart={(e) => handleDragStart(e, index)}
+                onDragOver={(e) => handleDragOver(e, index)}
+                onDrop={(e) => handleDrop(e, index)}
+                onDragEnd={handleDragEnd}
+                className={`hover:bg-blue-50/30 transition-colors group/row relative
                     ${draggedIndex === index ? 'opacity-40 bg-slate-100' : ''}
-                    ${dragOverIndex === index ? 'border-t-2 border-blue-500' : ''}
+                    ${dragOverIndex === index ? 'border-t-4 border-t-blue-500' : ''} 
                     ${isSelected ? 'bg-blue-50/60' : ''}
                   `}
+              >
+                {/* Checkbox Column */}
+                <td className="px-2 py-3 text-center">
+                  <button onClick={() => toggleSelection(step.id)} className="text-slate-400 hover:text-blue-500">
+                    {isSelected ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} />}
+                  </button>
+                </td>
+
+                {/* ID / Grip */}
+                <td className="px-2 py-3 text-center text-slate-300 font-bold truncate flex items-center gap-2">
+                  <div
+                    className="p-1 cursor-grab active:cursor-grabbing hover:text-blue-500 text-slate-300"
+                    onMouseDown={() => { canDragRef.current = true; }}
+                    onMouseUp={() => { canDragRef.current = false; }}
+                    onMouseLeave={() => { if(!draggedIndex) canDragRef.current = false; }}
                   >
-                    {/* Checkbox Column */}
-                    <td className="px-2 py-3 text-center">
-                      <button onClick={() => toggleSelection(step.id)} className="text-slate-400 hover:text-blue-500">
-                        {isSelected ? <CheckSquare size={16} className="text-blue-500" /> : <Square size={16} />}
-                      </button>
-                    </td>
+                    <GripVertical size={14} />
+                  </div>
+                  {step.order}
+                </td>
+                {/* Ação */}
+                <td className="px-1">
+                  <select
+                    value={step.action}
+                    onChange={(e) => updateStepAction(index, e.target.value as ActionType)}
+                    className="w-full bg-transparent font-bold text-slate-700 outline-none cursor-pointer truncate"
+                  >
+                    {Object.values(ActionType).map((a) => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
+                  </select>
+                </td>
+                {/* Elemento (Input Texto Direto) */}
+                <td className="px-1">
+                  <div className="flex items-center gap-1 group/field relative">
+                    <input
+                      type="text"
+                      value={step.field}
+                      disabled={isWaitAction}
+                      onChange={(e) => updateStep(index, 'field', e.target.value)}
+                      placeholder={isWaitAction ? "(Nenhum)" : "Nome do Elemento"}
+                      className={`w-full bg-transparent font-bold outline-none truncate pr-6 border-b border-transparent hover:border-slate-300 focus:border-blue-500 transition-colors ${
+                        isWaitAction ? 'text-slate-300 cursor-not-allowed' : (!step.field && !isWaitFor ? 'text-red-400' : 'text-blue-600')
+                      }`}
+                    />
 
-                    {/* ID / Grip */}
-                    <td className="px-2 py-3 text-center text-slate-300 font-bold truncate flex items-center gap-2">
-                      <div
-                          className="p-1 cursor-grab active:cursor-grabbing hover:text-blue-500 text-slate-300"
-                          onMouseDown={() => { canDragRef.current = true; }}
-                          onMouseUp={() => { canDragRef.current = false; }}
-                          onMouseLeave={() => { if(!draggedIndex) canDragRef.current = false; }}
-                      >
-                        <GripVertical size={14} />
-                      </div>
-                      {step.order}
-                    </td>
-                    {/* Ação */}
-                    <td className="px-1">
-                      <select
-                          value={step.action}
-                          onChange={(e) => updateStepAction(index, e.target.value as ActionType)}
-                          className="w-full bg-transparent font-bold text-slate-700 outline-none cursor-pointer truncate"
-                      >
-                        {Object.values(ActionType).map((a) => <option key={a} value={a}>{a.replace(/_/g, ' ')}</option>)}
-                      </select>
-                    </td>
-                    {/* Elemento */}
-                    <td className="px-1">
-                      <div className="flex items-center gap-1 group/field relative">
-                        <select
-                            value={step.field}
-                            disabled={isWaitAction}
-                            onChange={(e) => {
-                              if (e.target.value === '___NEW___') onRequestNewField(index);
-                              else updateStep(index, 'field', e.target.value);
-                            }}
-                            className={`flex-1 bg-transparent font-bold outline-none cursor-pointer truncate pr-6 w-full ${
-                                isWaitAction ? 'text-slate-300 cursor-not-allowed' : (!step.field && !isWaitFor ? 'text-red-400' : 'text-blue-600')
-                            }`}
+                    {isKnownElement && !isWaitAction && (
+                      <div className="flex items-center absolute right-0 bg-white/80 backdrop-blur-sm opacity-0 group-hover/field:opacity-100 transition-opacity shadow-sm rounded-md border border-slate-100 z-10">
+                        <button
+                          onClick={() => onDeleteElement(step.field)}
+                          className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-r-md"
                         >
-                          {isWaitAction ? (
-                              <option value="">(Nenhum)</option>
-                          ) : (
-                              <>
-                                {isWaitFor && <option value="">(Usar Seletor Direto)</option>}
-
-                                {/* Opção Mapear Novo no TOPO */}
-                                <option value="___NEW___" className="text-emerald-600 font-black">+ Mapear Novo...</option>
-                                <option disabled>────────────────────</option>
-
-                                {/* Opção placeholder apenas se estiver vazio */}
-                                {!step.field && <option value="">Selecione um elemento...</option>}
-
-                                {sortedCategories.map(cat => (
-                                    <optgroup key={cat} label={cat}>
-                                      {groupedElements[cat].map(el => (
-                                          <option key={el.friendlyName} value={el.friendlyName}>{el.friendlyName}</option>
-                                      ))}
-                                    </optgroup>
-                                ))}
-                                {!isKnownElement && step.field && (
-                                    <optgroup label="Desconhecido">
-                                      <option value={step.field}>{step.field} (Não mapeado)</option>
-                                    </optgroup>
-                                )}
-                              </>
-                          )}
-                        </select>
-
-                        {isKnownElement && !isWaitAction && (
-                            <div className="flex items-center absolute right-0 bg-white/80 backdrop-blur-sm opacity-0 group-hover/field:opacity-100 transition-opacity shadow-sm rounded-md border border-slate-100 z-10">
-                              <button
-                                  onClick={() => onEditElement(step.field)}
-                                  className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-l-md"
-                              >
-                                <Pencil size={10} />
-                              </button>
-                              <div className="w-px h-3 bg-slate-200"></div>
-                              <button
-                                  onClick={() => onDeleteElement(step.field)}
-                                  className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-r-md"
-                              >
-                                <Trash2 size={10} />
-                              </button>
-                            </div>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* COLUNA TID (NOVA) */}
-                    <td className="px-1">
-                      <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border 
-                        ${isWaitAction || !isKnownElement || !!currentCss
-                          ? 'bg-slate-100/50 border-transparent opacity-50'
-                          : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-100'}`}>
-                        <Fingerprint size={12} className={!!currentCss ? "text-slate-300" : "text-emerald-500"} />
-                        <input
-                            type="text"
-                            value={isWaitAction ? '' : currentTid}
-                            disabled={isWaitAction || !isKnownElement || !!currentCss}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              const newSelector = val ? `[tid="${val}"]` : '';
-                              if (element) updateSelector(element.friendlyName, newSelector);
-                            }}
-                            placeholder={isWaitAction ? "-" : (!!currentCss ? "(Bloqueado)" : "Ex: login_usuario")}
-                            className={`w-full bg-transparent font-mono text-[10px] outline-none truncate 
-                            ${(isWaitAction || !!currentCss) ? 'cursor-not-allowed text-slate-400' : 'text-slate-600 focus:text-blue-600 font-bold'}`}
-                        />
-                      </div>
-                    </td>
-
-                    {/* COLUNA CSS / XPATH (SEPARADA) */}
-                    <td className="px-1">
-                      <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border 
-                        ${isWaitAction || !isKnownElement || !!currentTid
-                          ? 'bg-slate-100/50 border-transparent opacity-50'
-                          : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-100'}`}>
-                        <Code2 size={12} className={!!currentTid ? "text-slate-300" : "text-slate-400"} />
-                        <input
-                            type="text"
-                            value={isWaitAction ? '' : currentCss}
-                            disabled={isWaitAction || !isKnownElement || !!currentTid}
-                            onChange={(e) => element && updateSelector(element.friendlyName, e.target.value)}
-                            placeholder={isWaitAction ? "-" : (!!currentTid ? "(Bloqueado)" : "#id ou //xpath")}
-                            className={`w-full bg-transparent font-mono text-[10px] outline-none truncate 
-                             ${(isWaitAction || !!currentTid) ? 'cursor-not-allowed text-slate-400' : 'text-slate-500 focus:text-blue-600'}`}
-                        />
-                      </div>
-                    </td>
-
-                    {/* Condição */}
-                    <td className="px-1">
-                      {showCondition ? (
-                          <select
-                              value={step.condition || ConditionType.CONTAINS}
-                              onChange={(e) => updateStep(index, 'condition', e.target.value)}
-                              className="w-full bg-slate-100/50 rounded px-1 py-1 font-bold text-slate-600 text-[10px] outline-none cursor-pointer border border-transparent hover:border-slate-200 focus:border-blue-200"
-                          >
-                            {Object.values(ConditionType).map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
-                          </select>
-                      ) : (
-                          <div className="text-center text-slate-300 font-bold text-[10px]">-</div>
-                      )}
-                    </td>
-                    {/* Valor */}
-                    <td className="px-1">
-                      <div className="flex items-center gap-2 pr-2">
-                        <input
-                            type="text"
-                            disabled={isDisabledCheck}
-                            value={step.value}
-                            onChange={(e) => updateStep(index, 'value', e.target.value)}
-                            placeholder={getPlaceholder(step.action)}
-                            className={`flex-1 border text-xs px-2 py-1.5 rounded-md font-medium transition-all w-full min-w-0 shadow-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none ${
-                                isDisabledCheck
-                                    ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
-                                    : 'bg-white border-slate-300 text-slate-700'
-                            }`}
-                        />
-                      </div>
-                    </td>
-                    {/* Ações */}
-                    <td className="px-4 text-right">
-                      <div className="flex items-center justify-end gap-1 relative">
-                        {isSelected ? (
-                            <div className="relative">
-                              <button
-                                  onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === step.id ? null : step.id); }}
-                                  className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                              >
-                                <MoreHorizontal size={16} />
-                              </button>
-
-                              {/* Batch Actions Menu */}
-                              {openMenuId === step.id && (
-                                  <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-50 animate-in zoom-in-95 overflow-hidden">
-                                    <div className="p-1">
-                                      <button
-                                          onClick={(e) => { e.stopPropagation(); handleCopySelected(); }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg text-left"
-                                      >
-                                        <Copy size={12} /> Copiar {selectedSteps.size} itens
-                                      </button>
-                                      <div className="h-px bg-slate-100 my-1"></div>
-                                      <button
-                                          onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
-                                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg text-left"
-                                      >
-                                        <Trash2 size={12} /> Excluir {selectedSteps.size} itens
-                                      </button>
-                                    </div>
-                                  </div>
-                              )}
-                            </div>
-                        ) : (
-                            <div className="flex flex-col mr-2">
-                              <button
-                                  onClick={() => moveStep(index, -1)}
-                                  disabled={index === 0}
-                                  className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
-                              >
-                                <ArrowUp size={12} />
-                              </button>
-                              <button
-                                  onClick={() => moveStep(index, 1)}
-                                  disabled={index === steps.length - 1}
-                                  className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
-                              >
-                                <ArrowDown size={12} />
-                              </button>
-                            </div>
-                        )}
-
-                        {/* Trash is always visible for quick single delete, or hidden if you prefer stricter mode. Keeping it for flexibility */}
-                        <button onClick={() => removeStep(index)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                          <Trash2 size={14} />
+                          <Trash2 size={10} />
                         </button>
                       </div>
-                    </td>
-                  </tr>
-              );
-            })}
-            {steps.length === 0 && (
-                <tr>
-                  <td colSpan={9} className="py-12 text-center">
-                    <p className="text-slate-400 font-bold italic">Nenhum passo definido para este cenário.</p>
-                  </td>
-                </tr>
-            )}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                  </div>
+                </td>
 
-        {/* Help Modal */}
-        {showHelp && (
-            <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur flex items-center justify-center p-8 animate-in fade-in duration-200">
-              <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-full">
-                <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                  <div>
-                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Variáveis</h3>
-                    <p className="text-xs text-slate-500">Use estes códigos no campo "Valor" para gerar dados dinâmicos.</p>
+                {/* COLUNA TID (NOVA) */}
+                <td className="px-1">
+                  <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border 
+                        ${isWaitAction || !step.field || !!currentCss
+                    ? 'bg-slate-100/50 border-transparent opacity-50'
+                    : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-100'}`}>
+                    <Fingerprint size={12} className={!!currentCss || !step.field ? "text-slate-300" : "text-emerald-500"} />
+                    <input
+                      type="text"
+                      value={isWaitAction ? '' : currentTid}
+                      disabled={isWaitAction || !step.field || !!currentCss}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        const newSelector = val ? `[tid="${val}"]` : '';
+                        updateOrCreateSelector(step.field, newSelector);
+                      }}
+                      placeholder={isWaitAction ? "-" : (!!currentCss ? "(Bloqueado)" : "Ex: login_usuario")}
+                      className={`w-full bg-transparent font-mono text-[10px] outline-none truncate 
+                            ${(isWaitAction || !step.field || !!currentCss) ? 'cursor-not-allowed text-slate-400' : 'text-slate-600 focus:text-blue-600 font-bold'}`}
+                    />
                   </div>
-                  <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X size={20}/></button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { code: '{HOJE}', desc: 'Data atual no formato DD/MM/AAAA' },
-                      { code: '{AMANHA}', desc: 'Data de amanhã (D+1) DD/MM/AAAA' },
-                      { code: '{ONTEM}', desc: 'Data de ontem (D-1) DD/MM/AAAA' },
-                      { code: '{AGORA}', desc: 'Data e hora atual com segundos' },
-                      { code: '{AGORA_SEM_SEGUNDOS}', desc: 'Data e hora atual sem segundos' },
-                      { code: '{AGORA_REGEX}', desc: 'Gera um Regex para o minuto atual (útil para validações)' },
-                      { code: '{ALEATORIO_NUM}', desc: 'Gera 4 dígitos aleatórios (Ex: 5821)' },
-                    ].map(item => (
-                        <div key={item.code} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                          <code className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-1 rounded">{item.code}</code>
-                          <p className="text-xs text-slate-500 mt-2 font-medium">{item.desc}</p>
-                        </div>
-                    ))}
+                </td>
+
+                {/* COLUNA CSS / XPATH (SEPARADA) */}
+                <td className="px-1">
+                  <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border 
+                        ${isWaitAction || !step.field || !!currentTid
+                    ? 'bg-slate-100/50 border-transparent opacity-50'
+                    : 'bg-white border-slate-200 focus-within:ring-2 focus-within:ring-blue-100'}`}>
+                    <Code2 size={12} className={!!currentTid || !step.field ? "text-slate-300" : "text-slate-400"} />
+                    <input
+                      type="text"
+                      value={isWaitAction ? '' : currentCss}
+                      disabled={isWaitAction || !step.field || !!currentTid}
+                      onChange={(e) => updateOrCreateSelector(step.field, e.target.value)}
+                      placeholder={isWaitAction ? "-" : (!!currentTid ? "(Bloqueado)" : "#id ou //xpath")}
+                      className={`w-full bg-transparent font-mono text-[10px] outline-none truncate 
+                             ${(isWaitAction || !step.field || !!currentTid) ? 'cursor-not-allowed text-slate-400' : 'text-slate-500 focus:text-blue-600'}`}
+                    />
                   </div>
-                </div>
+                </td>
+
+                {/* Condição */}
+                <td className="px-1">
+                  {showCondition ? (
+                    <select
+                      value={step.condition || ConditionType.CONTAINS}
+                      onChange={(e) => updateStep(index, 'condition', e.target.value)}
+                      className="w-full bg-slate-100/50 rounded px-1 py-1 font-bold text-slate-600 text-[10px] outline-none cursor-pointer border border-transparent hover:border-slate-200 focus:border-blue-200"
+                    >
+                      {Object.values(ConditionType).map(c => <option key={c} value={c}>{c.replace(/_/g, ' ')}</option>)}
+                    </select>
+                  ) : (
+                    <div className="text-center text-slate-300 font-bold text-[10px]">-</div>
+                  )}
+                </td>
+                {/* Valor */}
+                <td className="px-1">
+                  <div className="flex items-center gap-2 pr-2">
+                    <input
+                      type="text"
+                      disabled={isDisabledCheck}
+                      value={step.value}
+                      onChange={(e) => updateStep(index, 'value', e.target.value)}
+                      placeholder={isDisabledCheck ? "Bloqueado para esta ação" : getPlaceholder(step.action)}
+                      className={`flex-1 border text-xs px-2 py-1.5 rounded-md font-medium transition-all w-full min-w-0 shadow-sm focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none ${
+                        isDisabledCheck
+                          ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed italic'
+                          : 'bg-white border-slate-300 text-slate-700'
+                      }`}
+                    />
+                  </div>
+                </td>
+                {/* Ações */}
+                <td className="px-4 text-right">
+                  <div className="flex items-center justify-end gap-1 relative">
+                    {isSelected ? (
+                      <div className="relative">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === step.id ? null : step.id); }}
+                          className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        >
+                          <MoreHorizontal size={16} />
+                        </button>
+
+                        {/* Batch Actions Menu */}
+                        {openMenuId === step.id && (
+                          <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-50 animate-in zoom-in-95 overflow-hidden">
+                            <div className="p-1">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleCopySelected(); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg text-left"
+                              >
+                                <Copy size={12} /> Copiar {selectedSteps.size} itens
+                              </button>
+                              <div className="h-px bg-slate-100 my-1"></div>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
+                                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg text-left"
+                              >
+                                <Trash2 size={12} /> Excluir {selectedSteps.size} itens
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col mr-2">
+                        <button
+                          onClick={() => moveStep(index, -1)}
+                          disabled={index === 0}
+                          className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
+                        >
+                          <ArrowUp size={12} />
+                        </button>
+                        <button
+                          onClick={() => moveStep(index, 1)}
+                          disabled={index === steps.length - 1}
+                          className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
+                        >
+                          <ArrowDown size={12} />
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Trash is always visible for quick single delete, or hidden if you prefer stricter mode. Keeping it for flexibility */}
+                    <button onClick={() => removeStep(index)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+          {steps.length === 0 && (
+            <tr>
+              <td colSpan={9} className="py-12 text-center">
+                <p className="text-slate-400 font-bold italic">Nenhum passo definido para este cenário.</p>
+              </td>
+            </tr>
+          )}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Help Modal */}
+      {showHelp && (
+        <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur flex items-center justify-center p-8 animate-in fade-in duration-200">
+          <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-full">
+            <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+              <div>
+                <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Variáveis</h3>
+                <p className="text-xs text-slate-500">Use estes códigos no campo "Valor" para gerar dados dinâmicos.</p>
+              </div>
+              <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X size={20}/></button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {[
+                  { code: '{HOJE}', desc: 'Data atual no formato DD/MM/AAAA' },
+                  { code: '{AMANHA}', desc: 'Data de amanhã (D+1) DD/MM/AAAA' },
+                  { code: '{ONTEM}', desc: 'Data de ontem (D-1) DD/MM/AAAA' },
+                  { code: '{AGORA}', desc: 'Data e hora atual com segundos' },
+                  { code: '{AGORA_SEM_SEGUNDOS}', desc: 'Data e hora atual sem segundos' },
+                  { code: '{AGORA_REGEX}', desc: 'Gera um Regex para o minuto atual (útil para validações)' },
+                  { code: '{ALEATORIO_NUM}', desc: 'Gera 4 dígitos aleatórios (Ex: 5821)' },
+                ].map(item => (
+                  <div key={item.code} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
+                    <code className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-1 rounded">{item.code}</code>
+                    <p className="text-xs text-slate-500 mt-2 font-medium">{item.desc}</p>
+                  </div>
+                ))}
               </div>
             </div>
-        )}
-      </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };

@@ -306,6 +306,27 @@ async function ensureInput(element) {
   }
 }
 
+async function getElementValueOrText(driver, element) {
+  const tagName = await element.getTagName();
+
+  if (tagName === 'select') {
+    // Para dropdowns, pega o texto da opção selecionada
+    try {
+      const option = await element.findElement(By.css('option:checked'));
+      return await option.getText();
+    } catch (e) {
+      // Se nada selecionado, tenta valor
+      return await element.getAttribute('value');
+    }
+  }
+
+  let text = await element.getText();
+  if (!text) text = await driver.executeScript("return arguments[0].value", element);
+  if (!text && text !== "") text = await element.getAttribute('value');
+  return text;
+}
+
+
 async function autoAcceptCookies(driver) {
   const selectors = [
     "//div[contains(@class, 'termo-privacidade')]//*[contains(text(), 'Aceitar')]",
@@ -486,10 +507,7 @@ app.post('/run-test', async (req, res) => {
               if (finalValue && finalValue.trim() !== '') {
                 await driver.wait(async () => {
                   try {
-                    let text = await elWait.getText();
-                    if (!text) text = await driver.executeScript("return arguments[0].value", elWait);
-                    if (!text && text !== "") text = await elWait.getAttribute('value');
-
+                    const text = await getElementValueOrText(driver, elWait);
                     try {
                       checkCondition(text, finalValue, step.condition || 'CONTEM');
                       return true;
@@ -518,17 +536,14 @@ app.post('/run-test', async (req, res) => {
           case 'VALIDAR_TEXTO':
             const elContainer = await driver.wait(until.elementLocated(locator), 10000);
             const el = await ensureInput(elContainer);
-            let text = await el.getText();
-            if (!text) text = await driver.executeScript("return arguments[0].value", el);
-            if (!text && text !== "") text = await el.getAttribute('value');
+            const text = await getElementValueOrText(driver, el); // Usando helper melhorado
 
             checkCondition(text, finalValue, step.condition || 'CONTEM');
             break;
 
           case 'VALIDAR_PREENCHIMENTO':
             const elFilled = await driver.wait(until.elementLocated(locator), 10000);
-            let valToCheck = await driver.executeScript("return arguments[0].value", elFilled);
-            if (valToCheck === null || valToCheck === undefined) valToCheck = await elFilled.getText();
+            const valToCheck = await getElementValueOrText(driver, elFilled);
             const actualLength = (valToCheck || '').length;
 
             if (!finalValue || finalValue.trim() === '') {

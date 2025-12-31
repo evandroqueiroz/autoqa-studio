@@ -438,6 +438,12 @@
       "selector": "[tid=\"AlTransferencia.anoTransferencia\"]",
       "type": "input",
       "category": "Estoque"
+    },
+    {
+      "friendlyName": "rewdf",
+      "selector": "[tid=\"cvefew\"]",
+      "type": "input",
+      "category": "Geral"
     }
   ],
   "folders": [
@@ -454,7 +460,55 @@
     {
       "id": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",
       "name": "Estoque",
-      "isExpanded": true
+      "isExpanded": false
+    },
+    {
+      "id": "e78035ce-6204-43b3-aa2a-db0b55c7e9e3",
+      "name": "ESTOQUE",
+      "isExpanded": true,
+      "parentId": "01fbb1d4-c4d9-4679-b9df-36136e697fbd"
+    },
+    {
+      "id": "01fbb1d4-c4d9-4679-b9df-36136e697fbd",
+      "name": "Cadastros",
+      "isExpanded": true,
+      "parentId": "e78035ce-6204-43b3-aa2a-db0b55c7e9e3"
+    },
+    {
+      "id": "87d80a44-859a-4243-af8c-a0decb6e92c8",
+      "name": "Edição",
+      "isExpanded": false,
+      "parentId": "e78035ce-6204-43b3-aa2a-db0b55c7e9e3"
+    },
+    {
+      "id": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d",
+      "name": "ESTOQUE",
+      "isExpanded": true,
+      "parentId": "b9773cec-a737-4864-9561-d95d6c7b1902"
+    },
+    {
+      "id": "b9773cec-a737-4864-9561-d95d6c7b1902",
+      "name": "Cadastrar",
+      "isExpanded": true,
+      "parentId": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d"
+    },
+    {
+      "id": "2deb0e17-764a-4ba7-943d-eb305f5b9161",
+      "name": "Editar",
+      "isExpanded": false,
+      "parentId": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d"
+    },
+    {
+      "id": "57035966-1984-45ad-b8d5-cd6e31e8522a",
+      "name": "Consultar",
+      "isExpanded": false,
+      "parentId": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d"
+    },
+    {
+      "id": "200b5d2b-a134-43ec-8ed3-9854143a02ba",
+      "name": "Excluir",
+      "isExpanded": false,
+      "parentId": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d"
     }
   ],
   "testOrder": [
