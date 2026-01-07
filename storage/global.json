@@ -450,7 +450,7 @@
     {
       "id": "0b4ce6af-3be8-4618-9aa4-5c4d4aa02bbb",
       "name": "Login",
-      "isExpanded": false
+      "isExpanded": true
     },
     {
       "id": "67f76176-0299-4ded-9f0d-4f40b64da82d",
@@ -509,6 +509,12 @@
       "name": "Excluir",
       "isExpanded": false,
       "parentId": "0edcecc7-80e0-44cf-ba59-2ddea4fbcc1d"
+    },
+    {
+      "id": "905fbd95-5435-42e3-9708-db65f0c93c83",
+      "name": "Movimentações",
+      "isExpanded": false,
+      "parentId": "6a27391e-d39a-49a3-8cd8-6e6a074ce308"
     }
   ],
   "testOrder": [

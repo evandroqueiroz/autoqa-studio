@@ -1,7 +1,7 @@
 
 import express from 'express';
 import cors from 'cors';
-import { Builder, By, until } from 'selenium-webdriver';
+import { Builder, By, until, Key } from 'selenium-webdriver';
 import chrome from 'selenium-webdriver/chrome.js';
 import fs from 'fs';
 import path from 'path';
@@ -167,6 +167,10 @@ function getFormattedDate(date) {
   return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
 }
 
+function getYear(date) {
+  return new Date(date).getFullYear();
+}
+
 function getFormattedDateTime(date, withSeconds = true) {
   const d = new Date(date);
   const pad = (n) => n.toString().padStart(2, '0');
@@ -189,6 +193,9 @@ function processDynamicValue(value) {
 
   if (finalValue.includes('{HOJE}')) {
     finalValue = finalValue.replace(/{HOJE}/g, getFormattedDate(now));
+  }
+  if (finalValue.includes('{ANO_HOJE}')) {
+    finalValue = finalValue.replace(/{ANO_HOJE}/g, getYear(now));
   }
   if (finalValue.includes('{AMANHA}')) {
     const tomorrow = new Date(now);
@@ -306,26 +313,55 @@ async function ensureInput(element) {
   }
 }
 
-async function getElementValueOrText(driver, element) {
-  const tagName = await element.getTagName();
-
-  if (tagName === 'select') {
-    // Para dropdowns, pega o texto da opção selecionada
-    try {
-      const option = await element.findElement(By.css('option:checked'));
-      return await option.getText();
-    } catch (e) {
-      // Se nada selecionado, tenta valor
-      return await element.getAttribute('value');
-    }
+async function clicarDigitar(driver, locator, finalValue) {
+  const driverAwait = await driver.wait(until.elementLocated(locator), 10000);
+  const input = await ensureInput(driverAwait);
+  await input.click();
+  const actions = getActions(finalValue);
+  for (let index = 0; index < actions.length; index++) {
+    await makeAction(driver, input, actions[index]);
   }
-
-  let text = await element.getText();
-  if (!text) text = await driver.executeScript("return arguments[0].value", element);
-  if (!text && text !== "") text = await element.getAttribute('value');
-  return text;
 }
 
+function getActions(value) {
+  return value.match(/\{[^}]+\}|[^{}]+/g) ?? [];
+}
+
+async function makeAction(driver, input, action) {
+  if (isSleep(action)) {
+    let number = getNumber(action);
+    return await driver.sleep(number);
+  }
+  switch (action) {
+    case "{CLEAR}":
+      return await input.clear();
+    case "{ENTER}":
+      return await input.sendKeys(Key.ENTER);
+    case "{SPACE}":
+      return await input.sendKeys(Key.SPACE);
+    case "{UP}":
+      return await input.sendKeys(Key.UP);
+    case "{DOWN}":
+      return await input.sendKeys(Key.DOWN);
+    case "{LEFT}":
+      return await input.sendKeys(Key.LEFT);
+    case "{RIGHT}":
+      return await input.sendKeys(Key.RIGHT);
+    case "{TAB}":
+      return await input.sendKeys(Key.TAB);
+    default:
+      return await input.sendKeys(action);
+  }
+}
+
+function isSleep(value) {
+  return /^\{\d+\}$/.test(value);
+}
+
+function getNumber(value) {
+  const match = value.match(/^\{(\d+)\}$/);
+  return match ? Number(match[1]) : null;
+}
 
 async function autoAcceptCookies(driver) {
   const selectors = [
@@ -350,7 +386,7 @@ async function autoAcceptCookies(driver) {
   return false;
 }
 
-async function resilientClick(driver, locator) {
+async function resilientClick(driver, locator, value) {
   let targetElement = null;
 
   try {
@@ -364,16 +400,22 @@ async function resilientClick(driver, locator) {
     // Itera de TRÁS para FRENTE (do último para o primeiro no DOM).
     // Modais e Overlays geralmente são renderizados no final do <body>.
     // Filtra apenas os que estão VISÍVEIS.
-    for (let i = elements.length - 1; i >= 0; i--) {
-      try {
-        if (await elements[i].isDisplayed()) {
-          targetElement = elements[i];
-          break; // Encontrou o último visível (provavelmente o do modal)
+    if (value == null || value === "") {
+      for (let i = elements.length - 1; i >= 0; i--) {
+        try {
+          if (await elements[i].isDisplayed()) {
+            targetElement = elements[i];
+            break; // Encontrou o último visível (provavelmente o do modal)
+          }
+        } catch (e) {
+          // Ignora StaleElementReferenceException durante a iteração
         }
-      } catch (e) {
-        // Ignora StaleElementReferenceException durante a iteração
       }
+    } else {
+      console.log(`🔄 ${value}`);
+      targetElement = elements[Number(value)];
     }
+    
 
     // Se não encontrou nenhum visível na iteração, tenta o padrão (primeiro encontrado)
     if (!targetElement) {
@@ -493,7 +535,7 @@ app.post('/run-test', async (req, res) => {
             break;
 
           case 'CLICAR':
-            await resilientClick(driver, locator);
+            await resilientClick(driver, locator, finalValue);
             break;
 
           case 'ESPERAR':
@@ -507,7 +549,10 @@ app.post('/run-test', async (req, res) => {
               if (finalValue && finalValue.trim() !== '') {
                 await driver.wait(async () => {
                   try {
-                    const text = await getElementValueOrText(driver, elWait);
+                    let text = await elWait.getText();
+                    if (!text) text = await driver.executeScript("return arguments[0].value", elWait);
+                    if (!text && text !== "") text = await elWait.getAttribute('value');
+
                     try {
                       checkCondition(text, finalValue, step.condition || 'CONTEM');
                       return true;
@@ -536,14 +581,17 @@ app.post('/run-test', async (req, res) => {
           case 'VALIDAR_TEXTO':
             const elContainer = await driver.wait(until.elementLocated(locator), 10000);
             const el = await ensureInput(elContainer);
-            const text = await getElementValueOrText(driver, el); // Usando helper melhorado
+            let text = await el.getText();
+            if (!text) text = await driver.executeScript("return arguments[0].value", el);
+            if (!text && text !== "") text = await el.getAttribute('value');
 
             checkCondition(text, finalValue, step.condition || 'CONTEM');
             break;
 
           case 'VALIDAR_PREENCHIMENTO':
             const elFilled = await driver.wait(until.elementLocated(locator), 10000);
-            const valToCheck = await getElementValueOrText(driver, elFilled);
+            let valToCheck = await driver.executeScript("return arguments[0].value", elFilled);
+            if (valToCheck === null || valToCheck === undefined) valToCheck = await elFilled.getText();
             const actualLength = (valToCheck || '').length;
 
             if (!finalValue || finalValue.trim() === '') {
@@ -553,6 +601,34 @@ app.post('/run-test', async (req, res) => {
               if (isNaN(expectedLength)) throw new Error(`Para VALIDAR_PREENCHIMENTO, o valor informado deve ser numérico.`);
               checkCondition(actualLength, expectedLength, step.condition || 'IGUAL');
             }
+            break;
+
+          case 'DIGITAR_E_ENTER':
+            const teste = await driver.wait(until.elementLocated(locator), 10000);
+            const inputteste = await ensureInput(teste);
+            await inputteste.click();
+            await inputteste.clear();
+            await inputteste.sendKeys(finalValue);
+            await driver.sleep(1000);
+            await inputteste.sendKeys(Key.ENTER);
+            break;
+
+          case 'DIGITAR_DOWN_E_ENTER':
+            const testeDown = await driver.wait(until.elementLocated(locator), 10000);
+            const inputtesteDown = await ensureInput(testeDown);
+            await inputtesteDown.click();
+            await inputtesteDown.clear();
+            await inputtesteDown.sendKeys(finalValue);
+            await driver.sleep(1000);
+            await inputtesteDown.sendKeys(Key.SPACE);
+            await driver.sleep(5000);
+            await inputtesteDown.sendKeys(Key.DOWN);
+            await driver.sleep(1000);
+            await inputtesteDown.sendKeys(Key.ENTER);
+            break;
+
+          case 'CLICAR_E_DIGITAR':
+            await clicarDigitar(driver, locator, finalValue);
             break;
 
           case 'DIGITAR_E_SELECIONAR':

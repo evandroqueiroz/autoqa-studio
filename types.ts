@@ -7,7 +7,8 @@ export enum ActionType {
   VALIDATE_TEXT = 'VALIDAR_TEXTO',
   VALIDATE_FILLED = 'VALIDAR_PREENCHIMENTO',
   VALIDATE_DISABLED = 'VALIDAR_DESABILITADO',
-  SMART_SELECT = 'DIGITAR_E_SELECIONAR'
+  SMART_SELECT = 'DIGITAR_E_SELECIONAR',
+  CLICAR_E_DIGITAR = 'CLICAR_E_DIGITAR'
 }
 
 export enum ConditionType {
@@ -29,6 +30,7 @@ export interface TestStep {
   value: string;
   condition?: ConditionType;
   targetType?: string;
+  selector?: string;
 }
 
 export interface Folder {
@@ -60,7 +62,7 @@ export interface PageElement {
   selector: string;
   type: 'input' | 'button' | 'text';
   by?: 'css' | 'xpath';
-  category?: string; // Nova propriedade para agrupamento
+  category?: string; 
 }
 
 export interface StepExecutionResult {
