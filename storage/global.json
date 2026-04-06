@@ -460,7 +460,7 @@
     {
       "id": "6a27391e-d39a-49a3-8cd8-6e6a074ce308",
       "name": "Estoque",
-      "isExpanded": false
+      "isExpanded": true
     },
     {
       "id": "e78035ce-6204-43b3-aa2a-db0b55c7e9e3",
@@ -513,7 +513,7 @@
     {
       "id": "905fbd95-5435-42e3-9708-db65f0c93c83",
       "name": "Movimentações",
-      "isExpanded": false,
+      "isExpanded": true,
       "parentId": "6a27391e-d39a-49a3-8cd8-6e6a074ce308"
     }
   ],

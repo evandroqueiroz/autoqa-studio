@@ -73,7 +73,7 @@
       "order": 10,
       "action": "VALIDAR_TEXTO",
       "field": "Ano Entrada",
-      "value": "2025",
+      "value": "2026",
       "condition": "IGUAL"
     },
     {
