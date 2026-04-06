@@ -714,4 +714,4 @@ app.post('/run-test', async (req, res) => {
 });
 
 const PORT = 3000;
-app.listen(PORT, () => console.log(`🚀 SERVIDOR AUTO-QA PRONTO NA PORTA ${PORT}`));
+app.listen(PORT, '0.0.0.0',  () => console.log(`🚀 SERVIDOR AUTO-QA PRONTO NA PORTA ${PORT}`));
