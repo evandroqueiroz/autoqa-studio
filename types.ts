@@ -31,6 +31,8 @@ export interface TestStep {
   condition?: ConditionType;
   targetType?: string;
   selector?: string;
+  delay?: number;
+  typingDelay?: number;
 }
 
 export interface Folder {

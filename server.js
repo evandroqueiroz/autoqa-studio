@@ -1,75 +1,69 @@
-
 import express from 'express';
 import cors from 'cors';
-import { Builder, By, until, Key } from 'selenium-webdriver';
-import chrome from 'selenium-webdriver/chrome.js';
-import fs from 'fs';
-import path from 'path';
+import { chromium } from 'playwright';
+import { MongoClient } from 'mongodb';
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// --- Persistence Configuration ---
-const STORAGE_DIR = path.join(process.cwd(), 'storage');
-const TESTS_DIR = path.join(STORAGE_DIR, 'tests');
-const GLOBAL_FILE = path.join(STORAGE_DIR, 'global.json');
+// --- Database Configuration ---
+const mongoUrl = 'mongodb://localhost:27017';
+const dbName = 'autoqa';
+let db;
 
-// Garante que a estrutura de pastas existe ao iniciar
-if (!fs.existsSync(STORAGE_DIR)) fs.mkdirSync(STORAGE_DIR);
-if (!fs.existsSync(TESTS_DIR)) fs.mkdirSync(TESTS_DIR);
+async function connectDB() {
+  try {
+    const client = new MongoClient(mongoUrl);
+    await client.connect();
+    db = client.db(dbName);
+    console.log("🚀 Conectado ao MongoDB (autoqa)!");
+  } catch (error) {
+    console.error("❌ Erro ao conectar ao MongoDB:", error);
+  }
+}
+connectDB();
+
+app.get('/status', (req, res) => {
+  res.json({ dbConnected: !!db });
+});
 
 // --- Global Driver (Singleton) ---
-let globalDriver = null;
+let globalBrowser = null;
+let globalContext = null;
+let globalPage = null; // optional caching for single window
 let sessionCookies = [];
 
 // --- Persistence Endpoints ---
 
-app.get('/load-config', (req, res) => {
+app.get('/load-config', async (req, res) => {
   try {
-    // 1. Carrega Configurações Globais (Elementos, Pastas, ORDEM e URL GLOBAL)
-    let globalData = { elementMap: [], folders: [], testOrder: [], baseUrl: '' };
-    if (fs.existsSync(GLOBAL_FILE)) {
-      try {
-        const rawGlobal = fs.readFileSync(GLOBAL_FILE, 'utf8');
-        globalData = JSON.parse(rawGlobal);
-      } catch (e) {
-        console.error("Erro ao ler global.json:", e.message);
+    const configColl = db.collection('config');
+    const testsColl = db.collection('testCases');
+
+    let globalData = await configColl.findOne({ _id: 'global' });
+    if (!globalData) {
+      globalData = { elementMap: [], folders: [], testOrder: [], baseUrl: '' };
+    }
+
+    const loadedTestsCursor = await testsColl.find({});
+    const loadedTestsMap = new Map();
+    for await (const test of loadedTestsCursor) {
+      if (test.id) {
+        loadedTestsMap.set(test.id, test);
       }
     }
 
-    // 2. Carrega cada arquivo de teste individualmente (sem ordem garantida pelo SO)
-    const loadedTestsMap = new Map();
-    if (fs.existsSync(TESTS_DIR)) {
-      const files = fs.readdirSync(TESTS_DIR);
-      files.forEach(file => {
-        if (file.endsWith('.json')) {
-          try {
-            const content = fs.readFileSync(path.join(TESTS_DIR, file), 'utf8');
-            const test = JSON.parse(content);
-            if (test.id) {
-              loadedTestsMap.set(test.id, test);
-            }
-          } catch (e) {
-            console.error(`Erro ao ler teste ${file}:`, e.message);
-          }
-        }
-      });
-    }
-
-    // 3. Reconstrói o array de testes baseado na ordem salva (testOrder)
     const finalTestCases = [];
     const savedOrder = globalData.testOrder || [];
 
-    // Adiciona os testes na ordem que foram salvos
     savedOrder.forEach(id => {
       if (loadedTestsMap.has(id)) {
         finalTestCases.push(loadedTestsMap.get(id));
-        loadedTestsMap.delete(id); // Remove do mapa para saber o que sobrou
+        loadedTestsMap.delete(id);
       }
     });
 
-    // Adiciona quaisquer testes restantes (que existam no disco mas não na lista de ordem)
     loadedTestsMap.forEach(test => {
       finalTestCases.push(test);
     });
@@ -78,47 +72,49 @@ app.get('/load-config', (req, res) => {
       testCases: finalTestCases,
       elementMap: globalData.elementMap || [],
       folders: globalData.folders || [],
-      baseUrl: globalData.baseUrl || '' // Retorna a URL Global
+      baseUrl: globalData.baseUrl || '' 
     });
 
   } catch (e) {
     console.error("Erro fatal no load-config:", e);
-    res.status(500).json({ error: "Erro ao carregar configurações." });
+    res.status(500).json({ error: "Erro ao carregar configurações do MongoDB." });
   }
 });
 
-app.post('/save-config', (req, res) => {
+app.post('/save-config', async (req, res) => {
   try {
     const { testCases, elementMap, folders, baseUrl } = req.body;
-
-    // Extrai a ordem atual dos testes (IDs) para salvar no global
     const testOrder = testCases.map(t => t.id);
 
-    // 1. Salva Configurações Globais incluindo a ORDEM e BASEURL
-    fs.writeFileSync(GLOBAL_FILE, JSON.stringify({ elementMap, folders, testOrder, baseUrl }, null, 2));
+    const configColl = db.collection('config');
+    await configColl.updateOne(
+      { _id: 'global' },
+      { $set: { elementMap, folders, testOrder, baseUrl } },
+      { upsert: true }
+    );
 
-    // 2. Salva Testes Individuais
     const currentIds = new Set();
+    const testsColl = db.collection('testCases');
 
-    testCases.forEach(test => {
-      if (test && test.id) {
+    if (testCases.length > 0) {
+      const bulkOps = testCases.map(test => {
         currentIds.add(test.id);
-        const filePath = path.join(TESTS_DIR, `${test.id}.json`);
-        fs.writeFileSync(filePath, JSON.stringify(test, null, 2));
-      }
-    });
-
-    // 3. Limpeza (Garbage Collection)
-    if (fs.existsSync(TESTS_DIR)) {
-      const existingFiles = fs.readdirSync(TESTS_DIR);
-      existingFiles.forEach(file => {
-        if (file.endsWith('.json')) {
-          const id = file.replace('.json', '');
-          if (!currentIds.has(id)) {
-            fs.unlinkSync(path.join(TESTS_DIR, file));
+        const { _id, ...testData } = test; 
+        return {
+          updateOne: {
+            filter: { id: test.id },
+            update: { $set: testData },
+            upsert: true
           }
-        }
+        };
       });
+      await testsColl.bulkWrite(bulkOps);
+    }
+
+    if (currentIds.size > 0) {
+      await testsColl.deleteMany({ id: { $nin: Array.from(currentIds) } });
+    } else {
+      await testsColl.deleteMany({}); // Delete all if zero cases exist
     }
 
     res.json({ success: true });
@@ -128,32 +124,65 @@ app.post('/save-config', (req, res) => {
   }
 });
 
-// --- Endpoint para Resetar/Fechar o Navegador Manualmente ---
+app.get('/load-reports', async (req, res) => {
+  try {
+    const coll = db.collection('reports');
+    const reports = await coll.find().sort({_id: -1}).limit(50).toArray();
+    res.json({ reports });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/save-report', async (req, res) => {
+  try {
+    const { report } = req.body;
+    const coll = db.collection('reports');
+    await coll.insertOne(report);
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post('/clear-reports', async (req, res) => {
+  try {
+    const coll = db.collection('reports');
+    await coll.deleteMany({});
+    res.json({ success: true });
+  } catch(e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/reset-driver', async (req, res) => {
-  if (globalDriver) {
+  if (globalBrowser) {
     try {
-      await globalDriver.quit();
+      if (globalContext) await globalContext.close();
+      await globalBrowser.close();
     } catch (e) {
       console.log("Erro ao fechar driver (já estava fechado?)", e.message);
     }
-    globalDriver = null;
+    globalBrowser = null;
+    globalContext = null;
+    globalPage = null;
   }
   res.json({ success: true, message: "Navegador fechado e reiniciado." });
 });
 
-// --- Endpoint para Parada DE EMERGÊNCIA (Kill Switch) ---
 app.post('/stop-test', async (req, res) => {
   console.log("🛑 SOLICITAÇÃO DE PARADA DE EMERGÊNCIA RECEBIDA");
-  if (globalDriver) {
+  if (globalBrowser) {
     try {
-      // Ao dar quit(), qualquer comando pendente no /run-test vai lançar exceção
-      // e liberar a thread do teste.
-      await globalDriver.quit();
+      if (globalContext) await globalContext.close();
+      await globalBrowser.close();
       console.log("🛑 Driver eliminado com sucesso.");
     } catch (e) {
       console.log("Erro ao matar driver:", e.message);
     }
-    globalDriver = null;
+    globalBrowser = null;
+    globalContext = null;
+    globalPage = null;
   }
   res.json({ success: true, message: "Execução abortada no servidor." });
 });
@@ -271,7 +300,7 @@ function checkCondition(actual, expected, condition) {
   }
 }
 
-// --- Selenium Engine ---
+// --- Playwright Engine ---
 
 function resolveBy(elementInfo, fallbackSelector) {
   const selector = (elementInfo?.selector || fallbackSelector || '').trim();
@@ -280,46 +309,28 @@ function resolveBy(elementInfo, fallbackSelector) {
 
   if (selector.startsWith('LABEL:')) {
     const labelText = selector.replace('LABEL:', '').trim();
-    return By.xpath(`(//*[contains(text(), '${labelText}')])[last()]/following::input[1]`);
+    return `xpath=(//*[contains(text(), '${labelText}')])[last()]/following::input[1]`;
   }
 
   if (selector.startsWith('//') || selector.startsWith('(')) {
-    return By.xpath(selector);
+    return `xpath=${selector}`;
   }
 
-  // --- AUTOMAGIC TID SELECTOR ---
-  // Se for uma string simples (letras, números, hífens, underscore, pontos, dois pontos), assume que é um TID.
-  // Evita conflito com CSS classes (iniciam com .), IDs (#), atributos ([) ou hierarquia (space, >)
-  // ATENÇÃO: Permite pontos e dois pontos no meio da string, mas não no início (para não confundir com classes)
   if (/^[a-zA-Z0-9][a-zA-Z0-9_\-\.:]*$/.test(selector)) {
-    // Ex: "login_usuario" -> [tid="login_usuario"]
-    // Ex: "AlEntrada.numeroDocumento" -> [tid="AlEntrada.numeroDocumento"]
-    return By.css(`[tid="${selector}"]`);
+    return `css=[tid="${selector}"]`;
   }
 
   const by = elementInfo?.by || 'css';
-  return by === 'xpath' ? By.xpath(selector) : By.css(selector);
+  return by === 'xpath' ? `xpath=${selector}` : `css=${selector}`;
 }
 
-async function ensureInput(element) {
-  const tagName = await element.getTagName();
-  if (tagName === 'input' || tagName === 'textarea' || tagName === 'select') {
-    return element;
-  }
-  try {
-    return await element.findElement(By.css('input, textarea, select, button'));
-  } catch (e) {
-    return element;
-  }
-}
-
-async function clicarDigitar(driver, locator, finalValue) {
-  const driverAwait = await driver.wait(until.elementLocated(locator), 10000);
-  const input = await ensureInput(driverAwait);
-  await input.click();
+async function clicarDigitar(page, locatorStr, finalValue) {
+  const locator = await resolveInputLocator(page, locatorStr);
+  await locator.waitFor({state: 'visible', timeout: 10000});
+  await locator.click();
   const actions = getActions(finalValue);
   for (let index = 0; index < actions.length; index++) {
-    await makeAction(driver, input, actions[index]);
+    await makeAction(page, locator, actions[index]);
   }
 }
 
@@ -327,30 +338,30 @@ function getActions(value) {
   return value.match(/\{[^}]+\}|[^{}]+/g) ?? [];
 }
 
-async function makeAction(driver, input, action) {
+async function makeAction(page, input, action) {
   if (isSleep(action)) {
     let number = getNumber(action);
-    return await driver.sleep(number);
+    return await page.waitForTimeout(number);
   }
   switch (action) {
     case "{CLEAR}":
-      return await input.clear();
+      return await input.fill("");
     case "{ENTER}":
-      return await input.sendKeys(Key.ENTER);
+      return await page.keyboard.press("Enter");
     case "{SPACE}":
-      return await input.sendKeys(Key.SPACE);
+      return await page.keyboard.press("Space");
     case "{UP}":
-      return await input.sendKeys(Key.UP);
+      return await page.keyboard.press("ArrowUp");
     case "{DOWN}":
-      return await input.sendKeys(Key.DOWN);
+      return await page.keyboard.press("ArrowDown");
     case "{LEFT}":
-      return await input.sendKeys(Key.LEFT);
+      return await page.keyboard.press("ArrowLeft");
     case "{RIGHT}":
-      return await input.sendKeys(Key.RIGHT);
+      return await page.keyboard.press("ArrowRight");
     case "{TAB}":
-      return await input.sendKeys(Key.TAB);
+      return await page.keyboard.press("Tab");
     default:
-      return await input.sendKeys(action);
+      return await input.pressSequentially(action);
   }
 }
 
@@ -363,83 +374,72 @@ function getNumber(value) {
   return match ? Number(match[1]) : null;
 }
 
-async function autoAcceptCookies(driver) {
+async function autoAcceptCookies(page) {
   const selectors = [
-    "//div[contains(@class, 'termo-privacidade')]//*[contains(text(), 'Aceitar')]",
-    "//div[contains(@class, 'termo-privacidade')]//button",
-    "//button[contains(., 'Aceitar cookies')]",
-    ".termo-privacidade button"
+    "xpath=//div[contains(@class, 'termo-privacidade')]//*[contains(text(), 'Aceitar')]",
+    "xpath=//div[contains(@class, 'termo-privacidade')]//button",
+    "xpath=//button[contains(., 'Aceitar cookies')]",
+    "css=.termo-privacidade button"
   ];
   for (const sel of selectors) {
     try {
-      const locator = sel.startsWith('//') ? By.xpath(sel) : By.css(sel);
-      const elements = await driver.findElements(locator);
-      for (const el of elements) {
-        if (await el.isDisplayed()) {
-          await driver.executeScript("arguments[0].click();", el);
-          await driver.sleep(1000);
-          return true;
-        }
+      const el = page.locator(sel).first();
+      if (await el.isVisible({timeout: 1000})) {
+        await el.click({force: true});
+        await page.waitForTimeout(1000);
+        return true;
       }
     } catch (e) {}
   }
   return false;
 }
 
-async function resilientClick(driver, locator, value) {
-  let targetElement = null;
+async function resilientClick(page, locatorStr, value) {
+  const locator = page.locator(locatorStr);
 
   try {
-    // 1. Aguarda que pelo menos um elemento exista no DOM
-    await driver.wait(until.elementLocated(locator), 10000);
-
-    // 2. Busca TODOS os elementos que coincidem com o seletor
-    const elements = await driver.findElements(locator);
-
-    // 3. Estratégia de Prioridade para Modais:
-    // Itera de TRÁS para FRENTE (do último para o primeiro no DOM).
-    // Modais e Overlays geralmente são renderizados no final do <body>.
-    // Filtra apenas os que estão VISÍVEIS.
     if (value == null || value === "") {
-      for (let i = elements.length - 1; i >= 0; i--) {
-        try {
-          if (await elements[i].isDisplayed()) {
-            targetElement = elements[i];
-            break; // Encontrou o último visível (provavelmente o do modal)
-          }
-        } catch (e) {
-          // Ignora StaleElementReferenceException durante a iteração
+        const count = await locator.count();
+        let clicked = false;
+        
+        for (let i = count - 1; i >= 0; i--) {
+            const el = locator.nth(i);
+            if (await el.isVisible({timeout: 500}).catch(()=>false)) {
+                await el.scrollIntoViewIfNeeded();
+                await el.click();
+                clicked = true;
+                break;
+            }
         }
-      }
+        
+        if (!clicked) {
+            await locator.first().click();
+        }
     } else {
-      console.log(`🔄 ${value}`);
-      targetElement = elements[Number(value)];
+        console.log(`🔄 Clique index ${value}`);
+        const el = locator.nth(Number(value));
+        await el.scrollIntoViewIfNeeded();
+        await el.click();
     }
-    
-
-    // Se não encontrou nenhum visível na iteração, tenta o padrão (primeiro encontrado)
-    if (!targetElement) {
-      targetElement = await driver.findElement(locator);
-    }
-
-    // 4. Fluxo de Clique Seguro
-    await driver.wait(until.elementIsVisible(targetElement), 5000);
-    await driver.executeScript("arguments[0].scrollIntoView({block: 'center'});", targetElement);
-    await driver.sleep(500); // Pequeno delay para animações de modal terminarem
-    await targetElement.click();
-
   } catch (err) {
-    // Fallback: Tentativa de recuperação (Cookies ou JS Click)
-    await autoAcceptCookies(driver);
+    await autoAcceptCookies(page);
     try {
-      // Se falhou o clique normal, tenta pegar o elemento novamente e forçar JS
-      // (Usa o primeiro encontrado se a lógica complexa falhou)
-      const el = await driver.findElement(locator);
-      await driver.executeScript("arguments[0].click();", el);
+      console.log('🔄 Fallback Javascript click');
+      await locator.first().evaluate((node) => node.click());
     } catch(e2) {
-      throw err; // Lança o erro original se nada funcionar
+      throw err;
     }
   }
+}
+async function resolveInputLocator(page, locatorStr) {
+  const parentLocator = page.locator(locatorStr).first();
+  try {
+    const isInput = await parentLocator.evaluate(e => ['INPUT', 'TEXTAREA', 'SELECT'].includes(e.tagName) || e.isContentEditable).catch(() => true);
+    if (!isInput) {
+      return parentLocator.locator('input, textarea, select, [contenteditable="true"]').first();
+    }
+  } catch(e) {}
+  return parentLocator;
 }
 
 app.post('/run-test', async (req, res) => {
@@ -451,69 +451,63 @@ app.post('/run-test', async (req, res) => {
   if (targetUrl && !targetUrl.startsWith('http')) targetUrl = 'https://' + targetUrl;
 
   try {
-    // --- VERIFICAÇÃO DE DRIVER OTIMIZADA ---
-    if (globalDriver) {
-      try {
-        // Tenta um comando leve apenas para ver se está vivo
-        await globalDriver.getCurrentUrl();
-      } catch (e) {
-        console.log("⚠️ Driver antigo parece morto ou fechado. Recriando...");
-        globalDriver = null;
-      }
-    }
-
     let isFreshInstance = false;
-    if (!globalDriver) {
-      isFreshInstance = true;
-      console.log("🚀 Iniciando novo driver Chrome OTIMIZADO...");
-      const options = new chrome.Options();
-      options.addArguments('--disable-notifications');
-      options.addArguments('--start-maximized'); // Abre já maximizado (mais rápido que comando separado)
-      options.addArguments('--no-sandbox'); // Acelera em alguns ambientes
-      options.addArguments('--disable-dev-shm-usage'); // Evita crash de memória compartilhada
-      options.addArguments('--disable-gpu'); // Se não precisar de aceleração GPU
-      options.addArguments('--disable-extensions'); // Remove extensões pesadas
-      // options.setPageLoadStrategy('eager'); // Opcional: Não espera carregar todas as imagens para devolver controle (MUITO MAIS RÁPIDO)
-
-      globalDriver = await new Builder()
-          .forBrowser('chrome')
-          .setChromeOptions(options)
-          .build();
-
-      // Removido: await globalDriver.manage().window().maximize(); // Usando --start-maximized
+    
+    if (globalContext && !globalContext.browser()?.isConnected()) {
+        globalBrowser = null;
+        globalContext = null;
+        globalPage = null;
     }
 
-    const driver = globalDriver;
+    if (!globalContext) {
+      isFreshInstance = true;
+      console.log("🚀 Iniciando novo browser Playwright Chromium...");
+      globalBrowser = await chromium.launch({
+          headless: false,
+          args: [
+             '--disable-notifications',
+             '--start-maximized',
+             '--no-sandbox',
+             '--disable-dev-shm-usage',
+             '--disable-gpu',
+             '--disable-extensions'
+          ]
+      });
+      globalContext = await globalBrowser.newContext({
+          viewport: null, // Start maximized
+          ignoreHTTPSErrors: true
+      });
+      globalPage = await globalContext.newPage();
+    }
+
+    const page = globalPage;
 
     // Lógica de Navegação
     if (targetUrl) {
       if (!isFreshInstance) {
         console.log(`🔄 Reiniciando para o Menu Principal: ${targetUrl}`);
-        await driver.get(targetUrl);
+        await page.goto(targetUrl, {waitUntil: 'domcontentloaded'});
       } else {
-        const currentUrl = await driver.getCurrentUrl().catch(() => '');
+        const currentUrl = page.url();
         if (currentUrl !== targetUrl) {
-          await driver.get(targetUrl);
+           await page.goto(targetUrl, {waitUntil: 'domcontentloaded'});
         }
       }
     }
 
     if (isFreshInstance && testCase.useSession && sessionCookies.length > 0) {
       console.log(`🍪 [Nova Instância] Injetando ${sessionCookies.length} cookies...`);
-      for (const cookie of sessionCookies) {
-        try {
-          const { sameSite, httpOnly, secure, expiry, ...rest } = cookie;
-          await driver.manage().addCookie(rest);
-        } catch (e) {
-          console.warn("Falha ao injetar cookie:", cookie.name);
-        }
+      try {
+        await globalContext.addCookies(sessionCookies);
+        await page.reload({waitUntil: 'domcontentloaded'});
+        await page.waitForTimeout(1500);
+      } catch (e) {
+        console.warn("Falha ao injetar cookie:", e.message);
       }
-      await driver.navigate().refresh();
-      await driver.sleep(1500);
     }
 
-    await driver.sleep(500);
-    await autoAcceptCookies(driver);
+    await page.waitForTimeout(500);
+    await autoAcceptCookies(page);
 
     for (const step of testCase.steps) {
       const stepStartTime = Date.now();
@@ -521,50 +515,53 @@ app.post('/run-test', async (req, res) => {
       const elementInfo = elementMap.find(el => el.friendlyName === step.field);
 
       try {
-        const locator = resolveBy(elementInfo, step.value); // Passa value como fallback selector
+        const locatorStr = resolveBy(elementInfo, step.value); // Passa value como fallback selector
         const finalValue = processDynamicValue(step.value);
         reportValue = finalValue;
 
         switch (step.action) {
           case 'DIGITAR':
-            const containerEl = await driver.wait(until.elementLocated(locator), 10000);
-            const input = await ensureInput(containerEl);
-            await input.click();
-            await input.clear();
-            await input.sendKeys(finalValue);
+            const locatorInput = await resolveInputLocator(page, locatorStr);
+            await locatorInput.waitFor({state: 'visible', timeout: 10000});
+            await locatorInput.click();
+            await locatorInput.fill("");
+            if (step.typingDelay && step.typingDelay > 0) {
+              await locatorInput.pressSequentially(finalValue, { delay: step.typingDelay });
+            } else {
+              await locatorInput.fill(finalValue);
+            }
+            if (step.delay && step.delay > 0) await page.waitForTimeout(step.delay);
             break;
 
           case 'CLICAR':
-            await resilientClick(driver, locator, finalValue);
+            await resilientClick(page, locatorStr, finalValue);
             break;
 
           case 'ESPERAR':
-            await driver.sleep(parseInt(finalValue) || 1000);
+            await page.waitForTimeout(parseInt(finalValue) || 1000);
             break;
 
           case 'ESPERAR_QUE':
-            if (locator) {
-              const elWait = await driver.wait(until.elementLocated(locator), 15000);
+            if (locatorStr) {
+              const locatorWait = page.locator(locatorStr).first();
 
               if (finalValue && finalValue.trim() !== '') {
-                await driver.wait(async () => {
-                  try {
-                    let text = await elWait.getText();
-                    if (!text) text = await driver.executeScript("return arguments[0].value", elWait);
-                    if (!text && text !== "") text = await elWait.getAttribute('value');
-
-                    try {
-                      checkCondition(text, finalValue, step.condition || 'CONTEM');
-                      return true;
-                    } catch (err) {
-                      return false;
-                    }
-                  } catch (e) {
-                    return false;
+                  // Wait condition loop
+                  const startWait = Date.now();
+                  let conditionMet = false;
+                  while (Date.now() - startWait < 15000) {
+                      let text = await locatorWait.inputValue().catch(()=>null);
+                      if (text == null) text = await locatorWait.innerText().catch(()=>"");
+                      try {
+                          checkCondition(text, finalValue, step.condition || 'CONTEM');
+                          conditionMet = true;
+                          break;
+                      } catch(e) {}
+                      await page.waitForTimeout(1000);
                   }
-                }, 15000, `Esperando que elemento '${step.field}' satisfaça a condição '${step.condition}' com valor '${finalValue}'`);
+                  if (!conditionMet) throw new Error(`Condição '${step.condition}' não foi atingida para o valor '${finalValue}' no tempo estipulado.`);
               } else {
-                await driver.wait(until.elementIsVisible(elWait), 15000);
+                 await locatorWait.waitFor({state: 'visible', timeout: 15000});
               }
             } else {
               throw new Error("Seletor inválido para ESPERAR_QUE.");
@@ -572,26 +569,23 @@ app.post('/run-test', async (req, res) => {
             break;
 
           case 'VALIDAR_DESABILITADO':
-            const elDisContainer = await driver.wait(until.elementLocated(locator), 10000);
-            const elDis = await ensureInput(elDisContainer);
-            const isEnabled = await elDis.isEnabled();
+            const locDis = page.locator(locatorStr).first();
+            const isEnabled = await locDis.isEnabled({timeout: 10000});
             if (isEnabled) throw new Error("Falha: O elemento está habilitado (editável), mas deveria estar desabilitado.");
             break;
 
           case 'VALIDAR_TEXTO':
-            const elContainer = await driver.wait(until.elementLocated(locator), 10000);
-            const el = await ensureInput(elContainer);
-            let text = await el.getText();
-            if (!text) text = await driver.executeScript("return arguments[0].value", el);
-            if (!text && text !== "") text = await el.getAttribute('value');
-
+            const locText = page.locator(locatorStr).first();
+            await locText.waitFor({state: 'attached', timeout: 10000});
+            let text = await locText.inputValue().catch(()=>null);
+            if (text == null) text = await locText.innerText().catch(()=>"");
             checkCondition(text, finalValue, step.condition || 'CONTEM');
             break;
 
           case 'VALIDAR_PREENCHIMENTO':
-            const elFilled = await driver.wait(until.elementLocated(locator), 10000);
-            let valToCheck = await driver.executeScript("return arguments[0].value", elFilled);
-            if (valToCheck === null || valToCheck === undefined) valToCheck = await elFilled.getText();
+            const locFilled = page.locator(locatorStr).first();
+            let valToCheck = await locFilled.inputValue().catch(()=>null);
+            if (valToCheck == null) valToCheck = await locFilled.innerText().catch(()=>"");
             const actualLength = (valToCheck || '').length;
 
             if (!finalValue || finalValue.trim() === '') {
@@ -604,63 +598,66 @@ app.post('/run-test', async (req, res) => {
             break;
 
           case 'DIGITAR_E_ENTER':
-            const teste = await driver.wait(until.elementLocated(locator), 10000);
-            const inputteste = await ensureInput(teste);
-            await inputteste.click();
-            await inputteste.clear();
-            await inputteste.sendKeys(finalValue);
-            await driver.sleep(1000);
-            await inputteste.sendKeys(Key.ENTER);
+            const locDEE = await resolveInputLocator(page, locatorStr);
+            await locDEE.waitFor({state: 'visible', timeout: 10000});
+            await locDEE.click();
+            await locDEE.fill("");
+            await locDEE.fill(finalValue);
+            await page.waitForTimeout(1000);
+            await locDEE.press('Enter');
             break;
 
           case 'DIGITAR_DOWN_E_ENTER':
-            const testeDown = await driver.wait(until.elementLocated(locator), 10000);
-            const inputtesteDown = await ensureInput(testeDown);
-            await inputtesteDown.click();
-            await inputtesteDown.clear();
-            await inputtesteDown.sendKeys(finalValue);
-            await driver.sleep(1000);
-            await inputtesteDown.sendKeys(Key.SPACE);
-            await driver.sleep(5000);
-            await inputtesteDown.sendKeys(Key.DOWN);
-            await driver.sleep(1000);
-            await inputtesteDown.sendKeys(Key.ENTER);
+            const locDDEE = await resolveInputLocator(page, locatorStr);
+            await locDDEE.waitFor({state: 'visible', timeout: 10000});
+            await locDDEE.click();
+            await locDDEE.fill("");
+            await locDDEE.fill(finalValue);
+            await page.waitForTimeout(1000);
+            await locDDEE.press('Space');
+            await page.waitForTimeout(5000);
+            await locDDEE.press('ArrowDown');
+            await page.waitForTimeout(1000);
+            await locDDEE.press('Enter');
             break;
 
           case 'CLICAR_E_DIGITAR':
-            await clicarDigitar(driver, locator, finalValue);
+            await clicarDigitar(page, locatorStr, finalValue);
             break;
 
           case 'DIGITAR_E_SELECIONAR':
-            const comboContainer = await driver.wait(until.elementLocated(locator), 10000);
-            const comboInput = await ensureInput(comboContainer);
-            await comboInput.click();
-            await comboInput.clear();
-            await comboInput.sendKeys(finalValue);
-            await driver.sleep(1500);
+            const locCombo = await resolveInputLocator(page, locatorStr);
+            await locCombo.waitFor({state: 'visible', timeout: 10000});
+            await locCombo.click();
+            await locCombo.fill("");
+            await page.waitForTimeout(500); // Aguarda focus
+            await locCombo.pressSequentially(finalValue, { delay: step.typingDelay || 50 }); // Digitação humana
+            await locCombo.press('Space'); // O espaço solicitado para engatilhar pesquisa se necessário
+            await page.waitForTimeout(step.delay || 2000); // Tempo para o autocomplete buscar do backend
 
             let optionXpath;
             const cleanVal = finalValue.replace(/'/g, "");
 
             switch (step.targetType) {
-              case 'button': optionXpath = `//button[contains(., '${cleanVal}')]`; break;
-              case 'table': optionXpath = `//td[contains(., '${cleanVal}')]`; break;
-              case 'list': optionXpath = `//li[contains(., '${cleanVal}')]`; break;
-              case 'div': optionXpath = `//div[contains(., '${cleanVal}')]`; break;
-              case 'span': optionXpath = `//span[contains(., '${cleanVal}')]`; break;
-              case 'input': optionXpath = `//input[@value='${cleanVal}' or @placeholder='${cleanVal}']`; break;
+              case 'button': optionXpath = `xpath=//button[contains(., '${cleanVal}')]`; break;
+              case 'table': optionXpath = `xpath=//td[contains(., '${cleanVal}')]`; break;
+              case 'list': optionXpath = `xpath=//li[contains(., '${cleanVal}')]`; break;
+              case 'div': optionXpath = `xpath=//div[contains(., '${cleanVal}')]`; break;
+              case 'span': optionXpath = `xpath=//span[contains(., '${cleanVal}')]`; break;
+              case 'input': optionXpath = `xpath=//input[@value='${cleanVal}' or @placeholder='${cleanVal}']`; break;
               default:
-                optionXpath = `(//td[contains(@class, 'item') or contains(., '${cleanVal}')] | //li[contains(., '${cleanVal}')] | //div[contains(@class, 'item') and contains(., '${cleanVal}')] | //span[contains(., '${cleanVal}')] | *[text()='${cleanVal}'])[last()]`;
+                optionXpath = `xpath=(//td[contains(@class, 'item') or contains(., '${cleanVal}')] | //li[contains(., '${cleanVal}')] | //div[contains(@class, 'item') and contains(., '${cleanVal}')] | //span[contains(., '${cleanVal}')] | *[text()='${cleanVal}'])[last()]`;
             }
 
             try {
-              const option = await driver.wait(until.elementLocated(By.xpath(optionXpath)), 5000);
-              await driver.wait(until.elementIsVisible(option), 5000);
+              const option = page.locator(optionXpath).first();
+              await option.waitFor({state: 'visible', timeout: 5000});
               await option.click();
             } catch (e) {
               if (!step.targetType || step.targetType === 'any') {
-                const fallbackXpath = `//*[text()='${cleanVal}' and not(self::script)]`;
-                const fallbackOption = await driver.wait(until.elementLocated(By.xpath(fallbackXpath)), 3000);
+                const fallbackXpath = `xpath=//*[text()='${cleanVal}' and not(self::script)]`;
+                const fallbackOption = page.locator(fallbackXpath).first();
+                await fallbackOption.waitFor({state: 'visible', timeout: 3000});
                 await fallbackOption.click();
               } else {
                 throw new Error(`Opção "${finalValue}" não encontrada.`);
@@ -692,7 +689,7 @@ app.post('/run-test', async (req, res) => {
     }
 
     if (testCase.persistSession) {
-      sessionCookies = await driver.manage().getCookies();
+      sessionCookies = await globalContext.cookies();
       console.log(`💾 Sessão atualizada! ${sessionCookies.length} cookies em cache.`);
     }
 

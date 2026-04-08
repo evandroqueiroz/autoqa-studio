@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Code2, Pencil, ArrowUp, ArrowDown, Info, X, GripVertical, Fingerprint, Square, CheckSquare, MoreHorizontal, Clipboard, Copy } from 'lucide-react';
+import { Plus, Trash2, Code2, Pencil, Info, X, GripVertical, Fingerprint, Square, CheckSquare, MoreHorizontal, Clipboard, Copy } from 'lucide-react';
 import { TestStep, ActionType, PageElement, ConditionType } from '../types.ts';
 
 interface StepEditorProps {
@@ -24,7 +24,6 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                                       }) => {
 
     const [showHelp, setShowHelp] = useState(false);
-    // Ajustado larguras para incluir checkbox
     const [colWidths, setColWidths] = useState<number[]>([50, 40, 110, 180, 100, 180, 110, 180]);
     const resizingRef = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
 
@@ -623,24 +622,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                                     </div>
                                                 )}
                                             </div>
-                                        ) : (
-                                            <div className="flex flex-col mr-2">
-                                                <button
-                                                    onClick={() => moveStep(index, -1)}
-                                                    disabled={index === 0}
-                                                    className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
-                                                >
-                                                    <ArrowUp size={12} />
-                                                </button>
-                                                <button
-                                                    onClick={() => moveStep(index, 1)}
-                                                    disabled={index === steps.length - 1}
-                                                    className="text-slate-300 hover:text-blue-600 disabled:opacity-20 disabled:hover:text-slate-300"
-                                                >
-                                                    <ArrowDown size={12} />
-                                                </button>
-                                            </div>
-                                        )}
+                                        ) : null}
 
                                         {/* Trash is always visible for quick single delete, or hidden if you prefer stricter mode. Keeping it for flexibility */}
                                         <button onClick={() => removeStep(index)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
@@ -653,7 +635,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                     })}
                     {steps.length === 0 && (
                         <tr>
-                            <td colSpan={9} className="py-12 text-center">
+                            <td colSpan={10} className="py-12 text-center">
                                 <p className="text-slate-400 font-bold italic">Nenhum passo definido para este cenário.</p>
                             </td>
                         </tr>
@@ -664,8 +646,8 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
             {/* Help Modal */}
             {showHelp && (
-                <div className="absolute inset-0 z-50 bg-white/95 backdrop-blur flex items-center justify-center p-8 animate-in fade-in duration-200">
-                    <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-full">
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
                                 <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Variáveis</h3>

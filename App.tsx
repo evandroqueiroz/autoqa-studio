@@ -6,7 +6,7 @@ import {
     Folder, FolderOpen, FolderPlus, MoreVertical, ChevronDown, Pencil,
     PlayCircle, Cookie, Database, Loader2, StopCircle, Copy, ArrowRight,
     CheckCircle, XCircle, ChevronsDown, ChevronsUp, CheckSquare, Square,
-    Fingerprint, Code2, CornerDownRight, FilePlus, Search
+    Fingerprint, Code2, CornerDownRight, FilePlus, Search, Settings
 } from 'lucide-react';
 import { TestCase, LogEntry, ActionType, PageElement, TestReport, Folder as IFolder } from './types.ts';
 import { StepEditor } from './components/StepEditor.tsx';
@@ -14,6 +14,7 @@ import { LogConsole } from './components/LogConsole.tsx';
 import { ReportsView } from './components/ReportsView.tsx';
 
 // --- DEFAULTS LOCAIS (Substituindo constants.ts) ---
+const API_URL = `http://${window.location.hostname}:3000`;
 const DEFAULT_TEST_CASE: TestCase = {
     id: 'default-1',
     name: 'Novo Cenário',
@@ -73,6 +74,10 @@ const App: React.FC = () => {
     const [newFieldData, setNewFieldData] = useState({ name: '', selector: '', tid: '', category: '', stepIndex: -1 });
     const [isCreatingNewCategory, setIsCreatingNewCategory] = useState(false);
 
+    // Settings Modal
+    const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
+    const [dbConnected, setDbConnected] = useState<boolean | null>(null);
+
     const [moveTestId, setMoveTestId] = useState<string | null>(null);
 
     // Sidebar Menu State
@@ -104,7 +109,7 @@ const App: React.FC = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                const res = await fetch('http://localhost:3000/load-config');
+                const res = await fetch(`${API_URL}/load-config`);
                 const data = await res.json();
 
                 // Load Global URL
@@ -128,6 +133,15 @@ const App: React.FC = () => {
                 if (data.folders) {
                     setFolders(data.folders);
                 }
+
+                // Carrega Histórico de Relatórios
+                try {
+                    const reportsRes = await fetch(`${API_URL}/load-reports`);
+                    const reportsData = await reportsRes.json();
+                    if (reportsData.reports) setReports(reportsData.reports);
+                } catch(e) {
+                    console.error("Erro ao carregar relatórios", e);
+                }
             } catch (e) {
                 console.error("Erro ao carregar configurações do servidor. Usando padrões.", e);
                 setTestCases([DEFAULT_TEST_CASE]);
@@ -142,8 +156,18 @@ const App: React.FC = () => {
         const handleClickOutside = () => setActiveMenuId(null);
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
-
     }, []);
+
+    const openSettings = async () => {
+        setIsSettingsModalOpen(true);
+        try {
+            const res = await fetch(`${API_URL}/status`);
+            const data = await res.json();
+            setDbConnected(!!data.dbConnected);
+        } catch(e) {
+            setDbConnected(false);
+        }
+    };
 
     // Save data to server whenever it changes
     useEffect(() => {
@@ -151,7 +175,7 @@ const App: React.FC = () => {
 
         const saveData = async () => {
             try {
-                await fetch('http://localhost:3000/save-config', {
+                await fetch(`${API_URL}/save-config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ testCases, elementMap, folders, baseUrl })
@@ -615,7 +639,7 @@ const App: React.FC = () => {
 
     const handleResetDriver = async () => {
         try {
-            await fetch('http://localhost:3000/reset-driver', { method: 'POST' });
+            await fetch(`${API_URL}/reset-driver`, { method: 'POST' });
             addLog("Navegador fechado e reiniciado com sucesso.", "INFO");
         } catch(e) {
             addLog("Erro ao resetar navegador.", "ERROR");
@@ -632,7 +656,7 @@ const App: React.FC = () => {
             // INJETA URL GLOBAL NO TEST CASE ANTES DE ENVIAR
             const testCaseWithGlobalUrl = { ...testCase, startUrl: baseUrl };
 
-            const response = await fetch('http://localhost:3000/run-test', {
+            const response = await fetch(`${API_URL}/run-test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ testCase: testCaseWithGlobalUrl, elementMap })
@@ -651,6 +675,13 @@ const App: React.FC = () => {
             };
 
             setReports(prev => [...prev, newReport]);
+
+            // Salva relatório no servidor MongoDB
+            fetch(`${API_URL}/save-report`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ report: newReport })
+            }).catch(() => {});
 
             if(result.status === 'PASSED') {
                 addLog(`[PASSOU] ${testCase.name} (${result.duration}ms)`, 'SUCCESS');
@@ -691,7 +722,7 @@ const App: React.FC = () => {
 
         try {
             // Chama o endpoint de kill no servidor para parar o Selenium na hora
-            await fetch('http://localhost:3000/stop-test', { method: 'POST' });
+            await fetch(`${API_URL}/stop-test`, { method: 'POST' });
         } catch (e) {
             console.error("Erro ao enviar comando de stop:", e);
         }
@@ -1159,6 +1190,13 @@ const App: React.FC = () => {
                         {testCases.filter(tc => !tc.folderId).map(renderTestItem)}
                     </div>
                 </div>
+
+                {/* Sidebar Footer - Configurações */}
+                <div className="p-2 border-t border-slate-800 shrink-0 bg-slate-900">
+                    <button onClick={openSettings} className="w-full flex items-center justify-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-slate-400 hover:text-white transition-all hover:bg-slate-800">
+                        <Settings size={16} /> {isSidebarOpen && 'Configurações'}
+                    </button>
+                </div>
             </aside>
 
             {/* Main Content */}
@@ -1220,20 +1258,6 @@ const App: React.FC = () => {
                     {activeTab === 'editor' ? (
                         activeTest ? (
                             <>
-                                <div className="bg-white p-3 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-4">
-                                    <div className="flex flex-col gap-1 flex-1">
-                                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                            <Globe size={10} className="text-blue-500" /> URL Global do Projeto
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={baseUrl}
-                                            onChange={(e) => setBaseUrl(e.target.value)}
-                                            className="flex-1 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 font-bold text-xs text-slate-700 outline-none hover:bg-slate-100 focus:bg-white focus:ring-2 focus:ring-blue-100 transition-all"
-                                            placeholder="https://..."
-                                        />
-                                    </div>
-                                </div>
                                 <div className="flex-1 min-h-0">
                                     <StepEditor
                                         steps={activeTest.steps}
@@ -1274,6 +1298,70 @@ const App: React.FC = () => {
             </main>
 
             {/* --- MODALS --- */}
+            {/* Settings Modal */}
+            {isSettingsModalOpen && (
+                <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95">
+                        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                            <div>
+                                <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                                    <Settings size={16} className="text-slate-500"/> Configurações Gerais
+                                </h3>
+                            </div>
+                            <button onClick={() => setIsSettingsModalOpen(false)} className="p-1 hover:bg-slate-200 rounded-full text-slate-400 transition-colors">
+                                <X size={18} />
+                            </button>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Database size={12} className="text-blue-500" /> Status do Banco de Dados
+                                </label>
+                                <div className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-100 rounded-xl">
+                                    {dbConnected === null ? (
+                                        <Loader2 size={16} className="animate-spin text-slate-400" />
+                                    ) : dbConnected ? (
+                                        <>
+                                            <div className="w-3 h-3 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                            <span className="text-sm font-bold text-emerald-700">Conectado (MongoDB)</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <div className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.5)]"></div>
+                                            <span className="text-sm font-bold text-rose-700">Desconectado</span>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                            
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                    <Globe size={12} className="text-blue-500" /> URL Global do Projeto
+                                </label>
+                                <input
+                                    type="text"
+                                    value={baseUrl}
+                                    onChange={(e) => setBaseUrl(e.target.value)}
+                                    className="w-full bg-white border border-slate-200 rounded-xl px-4 py-3 font-bold text-sm text-slate-700 outline-none hover:border-slate-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all"
+                                    placeholder="https://sua-url-padrao.com"
+                                />
+                                <p className="text-[10px] text-slate-400 font-medium ml-1">
+                                    Ex: Usado onde for o Start URL principal do sistema.
+                                </p>
+                            </div>
+                        </div>
+                        <div className="p-4 bg-slate-50 flex justify-end">
+                            <button
+                                onClick={() => setIsSettingsModalOpen(false)}
+                                className="px-6 py-2.5 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-md shadow-blue-500/20 active:scale-95 transition-all"
+                            >
+                                Concluir
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Existing Modals code remains identical (Edit Element, New Field, Delete Test, Delete Folder, Move Test, Delete Element) */}
 
             {/* Edit Element Modal */}
