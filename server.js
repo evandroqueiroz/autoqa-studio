@@ -633,7 +633,7 @@ app.post('/run-test', async (req, res) => {
             await page.waitForTimeout(500); // Aguarda focus
             await locCombo.pressSequentially(finalValue, { delay: step.typingDelay || 50 }); // Digitação humana
             await locCombo.press('Space'); // O espaço solicitado para engatilhar pesquisa se necessário
-            await page.waitForTimeout(step.delay || 2000); // Tempo para o autocomplete buscar do backend
+            await page.waitForTimeout(step.delay || 1000); // Tempo para o autocomplete buscar do backend
 
             let optionXpath;
             const cleanVal = finalValue.replace(/'/g, "");
