@@ -546,10 +546,32 @@ const App: React.FC = () => {
                 return;
             }
 
-            // Aninhamento: Pasta arrastada vira filha da pasta alvo
-            setFolders(prev => prev.map(f => f.id === draggedFolderId ? { ...f, parentId: targetFolderId } : f));
-            // Expandir pasta alvo
-            setFolders(prev => prev.map(f => f.id === targetFolderId ? {...f, isExpanded: true} : f));
+            setFolders(prev => {
+                const dragIdx = prev.findIndex(f => f.id === draggedFolderId);
+                const dragFolder = prev[dragIdx];
+                const targetFolder = prev.find(f => f.id === targetFolderId);
+
+                if (!dragFolder || !targetFolder) return prev;
+
+                let updated = [...prev];
+                let shouldExpand = false;
+
+                if (dragFolder.parentId === targetFolder.parentId) {
+                    // Reordenar no mesmo nível
+                    updated.splice(dragIdx, 1);
+                    const insertIdx = updated.findIndex(f => f.id === targetFolderId);
+                    updated.splice(insertIdx, 0, dragFolder);
+                } else {
+                    // Aninhamento: Pasta arrastada vira filha da pasta alvo
+                    updated[dragIdx] = { ...dragFolder, parentId: targetFolderId };
+                    shouldExpand = true;
+                }
+
+                if (shouldExpand) {
+                    updated = updated.map(f => f.id === targetFolderId ? {...f, isExpanded: true} : f);
+                }
+                return updated;
+            });
 
             setDraggedFolderId(null);
             return;
@@ -661,7 +683,40 @@ const App: React.FC = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ testCase: testCaseWithGlobalUrl, elementMap })
             });
-            const result = await response.json();
+
+            if (!response.body) throw new Error("Sem resposta do servidor.");
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let finalResult: any = null;
+
+            while (true) {
+                const { done, value } = await reader.read();
+                if (value) {
+                    buffer += decoder.decode(value, { stream: !done });
+                    const lines = buffer.split('\n');
+                    buffer = lines.pop() || '';
+
+                    for (const line of lines) {
+                        if (!line.trim()) continue;
+                        try {
+                            const event = JSON.parse(line);
+                            if (event.type === 'LOG') {
+                                addLog(event.data.message, event.data.level);
+                            } else if (event.type === 'STEP_END' && event.data.status === 'ERROR') {
+                                addLog(`[ERRO] Passo falhou: ${event.data.error}`, 'ERROR');
+                            } else if (event.type === 'TEST_END') {
+                                finalResult = event.data;
+                            }
+                        } catch(e) {}
+                    }
+                }
+                if (done) break;
+            }
+
+            const result = finalResult;
+            if (!result) throw new Error("Teste finalizado sem resultado ou conexão abortada.");
 
             const newReport: TestReport = {
                 id: crypto.randomUUID(),
@@ -670,7 +725,7 @@ const App: React.FC = () => {
                 timestamp: new Date().toLocaleString('pt-BR'),
                 status: result.status,
                 duration: result.duration,
-                steps: result.steps,
+                steps: result.steps || [],
                 errorMessage: result.error
             };
 
@@ -718,7 +773,7 @@ const App: React.FC = () => {
 
     const stopExecution = async () => {
         abortExecutionRef.current = true;
-        addLog("🛑 INTERROMPENDO EXECUÇÃO IMEDIATAMENTE...", "ERROR");
+        addLog("INTERROMPENDO EXECUÇÃO IMEDIATAMENTE...", "ERROR");
 
         try {
             // Chama o endpoint de kill no servidor para parar o Selenium na hora

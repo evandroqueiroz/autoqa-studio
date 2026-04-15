@@ -345,7 +345,8 @@ async function makeAction(page, input, action) {
   }
   switch (action) {
     case "{CLEAR}":
-      return await input.fill("");
+      if (input) return await input.fill("");
+      return;
     case "{ENTER}":
       return await page.keyboard.press("Enter");
     case "{SPACE}":
@@ -361,7 +362,8 @@ async function makeAction(page, input, action) {
     case "{TAB}":
       return await page.keyboard.press("Tab");
     default:
-      return await input.pressSequentially(action);
+      if (input) return await input.pressSequentially(action);
+      return await page.keyboard.insertText(action);
   }
 }
 
@@ -443,6 +445,12 @@ async function resolveInputLocator(page, locatorStr) {
 }
 
 app.post('/run-test', async (req, res) => {
+  res.writeHead(200, {
+    'Content-Type': 'text/plain; charset=utf-8',
+    'Transfer-Encoding': 'chunked'
+  });
+  const sendEvent = (type, data) => res.write(JSON.stringify({ type, data }) + '\n');
+
   const { testCase, elementMap } = req.body;
   const startTime = Date.now();
   const stepResults = [];
@@ -510,26 +518,57 @@ app.post('/run-test', async (req, res) => {
     await autoAcceptCookies(page);
 
     for (const step of testCase.steps) {
+      if (step.disabled) {
+        stepResults.push({
+          stepId: step.id,
+          status: 'SKIPPED',
+          duration: 0,
+          action: step.action,
+          field: step.field,
+          value: step.value
+        });
+        continue;
+      }
+      
       const stepStartTime = Date.now();
       let reportValue = step.value;
       const elementInfo = elementMap.find(el => el.friendlyName === step.field);
 
+      sendEvent('STEP_START', { stepId: step.id });
+      sendEvent('LOG', { level: 'INFO', message: `▶ Início passo [${step.order}]: ${step.action}` });
+
       try {
-        const locatorStr = resolveBy(elementInfo, step.value); // Passa value como fallback selector
+        const locatorStr = resolveBy(elementInfo, step.selector); // Fallback para selector ad-hoc (nunca o value)
         const finalValue = processDynamicValue(step.value);
         reportValue = finalValue;
 
         switch (step.action) {
+          case 'TECLAS_ATALHO': {
+            const shortcutActions = getActions(finalValue);
+            const hasElement = !!(step.field && step.field.trim() !== '') || !!(step.selector && step.selector.trim() !== '');
+            if (hasElement && locatorStr) {
+               const locatorShortcut = await resolveInputLocator(page, locatorStr);
+               await locatorShortcut.waitFor({state: 'visible', timeout: 5000});
+               await locatorShortcut.click();
+               for (const act of shortcutActions) {
+                 await makeAction(page, locatorShortcut, act);
+               }
+            } else {
+               // Sem elemento: envia teclas globalmente para a página
+               for (const act of shortcutActions) {
+                 await makeAction(page, null, act);
+               }
+            }
+            break;
+          }
+
           case 'DIGITAR':
             const locatorInput = await resolveInputLocator(page, locatorStr);
             await locatorInput.waitFor({state: 'visible', timeout: 10000});
             await locatorInput.click();
             await locatorInput.fill("");
-            if (step.typingDelay && step.typingDelay > 0) {
-              await locatorInput.pressSequentially(finalValue, { delay: step.typingDelay });
-            } else {
-              await locatorInput.fill(finalValue);
-            }
+            await page.waitForTimeout(500); // Aguarda focus e estabilização de frameworks (ex: React)
+            await locatorInput.pressSequentially(finalValue, { delay: step.typingDelay || 50 });
             if (step.delay && step.delay > 0) await page.waitForTimeout(step.delay);
             break;
 
@@ -569,32 +608,67 @@ app.post('/run-test', async (req, res) => {
             break;
 
           case 'VALIDAR_DESABILITADO':
-            const locDis = page.locator(locatorStr).first();
-            const isEnabled = await locDis.isEnabled({timeout: 10000});
-            if (isEnabled) throw new Error("Falha: O elemento está habilitado (editável), mas deveria estar desabilitado.");
+            const locDis = await resolveInputLocator(page, locatorStr);
+            const startWaitDis = Date.now();
+            let isDisabled = false;
+            while(Date.now() - startWaitDis < 15000) {
+                // Checa com evaluate para ser ainda mais preciso com bibliotecas antigas (GWT/JSF) que usam readOnly ou property loose
+                const isDis = await locDis.evaluate(node => node.disabled || node.readOnly || node.hasAttribute('disabled')).catch(() => false);
+                if (isDis) {
+                    isDisabled = true;
+                    break;
+                }
+                await page.waitForTimeout(500);
+            }
+            if (!isDisabled) throw new Error("Falha: O elemento está habilitado (editável), mas deveria estar desabilitado.");
             break;
 
           case 'VALIDAR_TEXTO':
             const locText = page.locator(locatorStr).first();
-            await locText.waitFor({state: 'attached', timeout: 10000});
-            let text = await locText.inputValue().catch(()=>null);
-            if (text == null) text = await locText.innerText().catch(()=>"");
-            checkCondition(text, finalValue, step.condition || 'CONTEM');
+            const startWaitText = Date.now();
+            let lastErrText;
+            let textMet = false;
+            while(Date.now() - startWaitText < 15000) {
+              try {
+                let text = await locText.inputValue().catch(()=>null);
+                if (text == null) text = await locText.innerText().catch(()=>"");
+                checkCondition(text, finalValue, step.condition || 'CONTEM');
+                textMet = true;
+                break;
+              } catch(err) {
+                lastErrText = err;
+              }
+              await page.waitForTimeout(500);
+            }
+            if (!textMet) throw lastErrText;
             break;
 
           case 'VALIDAR_PREENCHIMENTO':
             const locFilled = page.locator(locatorStr).first();
-            let valToCheck = await locFilled.inputValue().catch(()=>null);
-            if (valToCheck == null) valToCheck = await locFilled.innerText().catch(()=>"");
-            const actualLength = (valToCheck || '').length;
+            const startWaitPreenc = Date.now();
+            let lastErrPreenc;
+            let preencMet = false;
+            while(Date.now() - startWaitPreenc < 15000) {
+              try {
+                let valToCheck = await locFilled.inputValue().catch(()=>null);
+                if (valToCheck == null) valToCheck = await locFilled.innerText().catch(()=>"");
+                const actualLength = (valToCheck || '').length;
 
-            if (!finalValue || finalValue.trim() === '') {
-              if (actualLength === 0) throw new Error("O campo está vazio.");
-            } else {
-              const expectedLength = parseInt(finalValue);
-              if (isNaN(expectedLength)) throw new Error(`Para VALIDAR_PREENCHIMENTO, o valor informado deve ser numérico.`);
-              checkCondition(actualLength, expectedLength, step.condition || 'IGUAL');
+                if (!finalValue || finalValue.trim() === '') {
+                  if (actualLength === 0) throw new Error("O campo está vazio.");
+                } else {
+                  const expectedLength = parseInt(finalValue);
+                  if (isNaN(expectedLength)) throw new Error(`Para VALIDAR_PREENCHIMENTO, o valor informado deve ser numérico.`);
+                  checkCondition(actualLength, expectedLength, step.condition || 'IGUAL');
+                }
+                preencMet = true;
+                break;
+              } catch(err) {
+                lastErrPreenc = err;
+              }
+              await page.waitForTimeout(500);
             }
+            if (!preencMet) throw lastErrPreenc;
             break;
 
           case 'DIGITAR_E_ENTER':
@@ -674,6 +748,7 @@ app.post('/run-test', async (req, res) => {
           field: step.field,
           value: reportValue
         });
+        sendEvent('STEP_END', { stepId: step.id, status: 'SUCCESS' });
       } catch (err) {
         stepResults.push({
           stepId: step.id,
@@ -684,6 +759,7 @@ app.post('/run-test', async (req, res) => {
           field: step.field,
           value: reportValue
         });
+        sendEvent('STEP_END', { stepId: step.id, status: 'ERROR', error: err.message });
         throw err;
       }
     }
@@ -693,20 +769,22 @@ app.post('/run-test', async (req, res) => {
       console.log(`💾 Sessão atualizada! ${sessionCookies.length} cookies em cache.`);
     }
 
-    res.json({
+    sendEvent('TEST_END', {
       success: true,
       status: 'PASSED',
       duration: Date.now() - startTime,
       steps: stepResults
     });
+    res.end();
   } catch (error) {
-    res.status(500).json({
+    sendEvent('TEST_END', {
       success: false,
       status: 'FAILED',
       error: error.message,
       duration: Date.now() - startTime,
       steps: stepResults
     });
+    res.end();
   }
 });
 

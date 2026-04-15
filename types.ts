@@ -8,7 +8,8 @@ export enum ActionType {
   VALIDATE_FILLED = 'VALIDAR_PREENCHIMENTO',
   VALIDATE_DISABLED = 'VALIDAR_DESABILITADO',
   SMART_SELECT = 'DIGITAR_E_SELECIONAR',
-  CLICAR_E_DIGITAR = 'CLICAR_E_DIGITAR'
+  CLICAR_E_DIGITAR = 'CLICAR_E_DIGITAR',
+  SHORTCUT = 'TECLAS_ATALHO'
 }
 
 export enum ConditionType {
@@ -33,6 +34,7 @@ export interface TestStep {
   selector?: string;
   delay?: number;
   typingDelay?: number;
+  disabled?: boolean;
 }
 
 export interface Folder {
@@ -69,7 +71,7 @@ export interface PageElement {
 
 export interface StepExecutionResult {
   stepId: string;
-  status: 'SUCCESS' | 'ERROR';
+  status: 'SUCCESS' | 'ERROR' | 'SKIPPED';
   message?: string;
   duration?: number;
   action?: string;

@@ -24,7 +24,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                                       }) => {
 
     const [showHelp, setShowHelp] = useState(false);
-    const [colWidths, setColWidths] = useState<number[]>([50, 40, 110, 180, 100, 180, 110, 180]);
+    const [colWidths, setColWidths] = useState<number[]>([50, 40, 110, 180, 100, 180, 110, 180, 70]);
     const resizingRef = useRef<{ index: number; startX: number; startWidth: number } | null>(null);
 
     // Selection & Clipboard States
@@ -39,6 +39,9 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
     const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
     const canDragRef = useRef(false);
+
+    // Context Menu State
+    const [contextMenu, setContextMenu] = useState<{ x: number, y: number, stepIndex: number } | null>(null);
 
     // Check clipboard on mount
     useEffect(() => {
@@ -63,6 +66,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
     useEffect(() => {
         const handleClickOutside = () => {
             setOpenMenuId(null);
+            setContextMenu(null);
             // Não fechamos o editingValueId aqui pois o onBlur do input já cuida disso
         };
         document.addEventListener('click', handleClickOutside);
@@ -189,6 +193,26 @@ export const StepEditor: React.FC<StepEditorProps> = ({
         onUpdateSteps(newSteps);
     };
 
+    const handleContextMenu = (e: React.MouseEvent, index: number) => {
+        e.preventDefault();
+        setContextMenu({ x: e.clientX, y: e.clientY, stepIndex: index });
+    };
+
+    const handleDuplicateStep = (index: number) => {
+        const stepToDuplicate = steps[index];
+        const newStep = { ...stepToDuplicate, id: crypto.randomUUID() };
+        const newSteps = [...steps];
+        newSteps.splice(index + 1, 0, newStep);
+        const reorderedSteps = newSteps.map((s, i) => ({ ...s, order: i + 1 }));
+        onUpdateSteps(reorderedSteps);
+    };
+
+    const handleToggleDisableStep = (index: number) => {
+        const newSteps = [...steps];
+        newSteps[index] = { ...newSteps[index], disabled: !newSteps[index].disabled };
+        onUpdateSteps(newSteps);
+    };
+
     const moveStep = (index: number, direction: -1 | 1) => {
         const newIndex = index + direction;
         if (newIndex < 0 || newIndex >= steps.length) return;
@@ -305,6 +329,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
             case ActionType.SMART_SELECT: return "Opção para selecionar...";
             case ActionType.VALIDATE_DISABLED: return "Sem parâmetro";
             case ActionType.CLICK: return "Sem parâmetro";
+            case ActionType.SHORTCUT: return "Ex: {TAB}, {ENTER}...";
             default: return "Valor a digitar...";
         }
     };
@@ -346,6 +371,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
         { label: 'CSS / XPath', index: 5 },
         { label: 'Condição', index: 6 },
         { label: 'Valor / Texto', index: 7 },
+        { label: 'Atraso (ms)', index: 8 },
     ];
 
     return (
@@ -409,14 +435,13 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                 )}
                             </th>
                         ))}
-                        <th className="px-4 py-4 w-24 text-right">Ações</th>
                     </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
                     {steps.map((step, index) => {
                         const element = elementMap.find(e => e.friendlyName === step.field);
                         const isKnownElement = !!element;
-                        const isWaitAction = step.action === ActionType.WAIT;
+                        const isWaitAction = step.action === ActionType.WAIT || step.action === ActionType.SHORTCUT;
                         const isWaitFor = step.action === ActionType.WAIT_FOR;
                         const isDisabledCheck = step.action === ActionType.VALIDATE_DISABLED || step.action === ActionType.CLICK; // AGORA INCLUI CLICK
                         const isSelected = selectedSteps.has(step.id);
@@ -436,6 +461,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                             <tr
                                 key={step.id}
                                 draggable="true"
+                                onContextMenu={(e) => handleContextMenu(e, index)}
                                 onDragStart={(e) => handleDragStart(e, index)}
                                 onDragOver={(e) => handleDragOver(e, index)}
                                 onDrop={(e) => handleDrop(e, index)}
@@ -444,6 +470,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                     ${draggedIndex === index ? 'opacity-40 bg-slate-100' : ''}
                     ${dragOverIndex === index ? 'border-t-4 border-t-blue-500' : ''} 
                     ${isSelected ? 'bg-blue-50/60' : ''}
+                    ${step.disabled ? 'opacity-50 grayscale bg-slate-50 line-through decoration-slate-300' : ''}
                   `}
                             >
                                 {/* Checkbox Column */}
@@ -589,46 +616,19 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                         )}
                                     </div>
                                 </td>
-                                {/* Ações */}
-                                <td className="px-4 text-right">
-                                    <div className="flex items-center justify-end gap-1 relative">
-                                        {isSelected ? (
-                                            <div className="relative">
-                                                <button
-                                                    onClick={(e) => { e.stopPropagation(); setOpenMenuId(openMenuId === step.id ? null : step.id); }}
-                                                    className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                >
-                                                    <MoreHorizontal size={16} />
-                                                </button>
-
-                                                {/* Batch Actions Menu */}
-                                                {openMenuId === step.id && (
-                                                    <div className="absolute right-0 top-full mt-1 w-40 bg-white rounded-xl shadow-xl border border-slate-100 z-50 animate-in zoom-in-95 overflow-hidden">
-                                                        <div className="p-1">
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleCopySelected(); }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 rounded-lg text-left"
-                                                            >
-                                                                <Copy size={12} /> Copiar {selectedSteps.size} itens
-                                                            </button>
-                                                            <div className="h-px bg-slate-100 my-1"></div>
-                                                            <button
-                                                                onClick={(e) => { e.stopPropagation(); handleDeleteSelected(); }}
-                                                                className="w-full flex items-center gap-2 px-3 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-lg text-left"
-                                                            >
-                                                                <Trash2 size={12} /> Excluir {selectedSteps.size} itens
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        ) : null}
-
-                                        {/* Trash is always visible for quick single delete, or hidden if you prefer stricter mode. Keeping it for flexibility */}
-                                        <button onClick={() => removeStep(index)} className="p-1.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                            <Trash2 size={14} />
-                                        </button>
-                                    </div>
+                                {/* Atraso */}
+                                <td className="px-1 text-center">
+                                    <input
+                                        type="number"
+                                        min="0"
+                                        placeholder="50"
+                                        value={step.typingDelay === undefined ? '' : step.typingDelay}
+                                        onChange={(e) => updateStep(index, 'typingDelay', e.target.value ? parseInt(e.target.value) : undefined)}
+                                        disabled={step.action !== ActionType.TYPE && step.action !== ActionType.SMART_SELECT && step.action !== ActionType.CLICAR_E_DIGITAR}
+                                        title="Lentidão humana (ms) a cada tecla digitada"
+                                        className={`w-full text-center bg-transparent border border-transparent hover:border-slate-300 focus:border-blue-500 rounded px-1 py-1.5 text-xs font-bold text-slate-600 outline-none transition-colors
+                                            ${(step.action !== ActionType.TYPE && step.action !== ActionType.SMART_SELECT && step.action !== ActionType.CLICAR_E_DIGITAR) ? 'opacity-30 cursor-not-allowed' : 'bg-slate-50'}`}
+                                    />
                                 </td>
                             </tr>
                         );
@@ -682,6 +682,35 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                             </div>
                         </div>
                     </div>
+                </div>
+            )}
+
+            {/* Context Menu Modal */}
+            {contextMenu && (
+                <div 
+                    className="fixed z-[100] bg-white rounded-xl shadow-xl border border-slate-100 py-1 w-32 animate-in zoom-in-95"
+                    style={{ top: contextMenu.y, left: contextMenu.x }}
+                    onClick={(e) => e.stopPropagation()} 
+                >
+                    <button 
+                        onClick={() => { handleToggleDisableStep(contextMenu.stepIndex); setContextMenu(null); }}
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                        {steps[contextMenu.stepIndex]?.disabled ? 'Habilitar' : 'Inabilitar'}
+                    </button>
+                    <button 
+                        onClick={() => { handleDuplicateStep(contextMenu.stepIndex); setContextMenu(null); }}
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                    >
+                        Duplicar
+                    </button>
+                    <div className="h-px bg-slate-100 my-1"></div>
+                    <button 
+                        onClick={() => { removeStep(contextMenu.stepIndex); setContextMenu(null); }}
+                        className="w-full text-left px-4 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-colors"
+                    >
+                        Excluir
+                    </button>
                 </div>
             )}
         </div>
