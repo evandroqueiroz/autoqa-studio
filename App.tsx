@@ -8,7 +8,7 @@ import {
     CheckCircle, XCircle, ChevronsDown, ChevronsUp, CheckSquare, Square,
     Fingerprint, Code2, CornerDownRight, FilePlus, Search, Settings
 } from 'lucide-react';
-import { TestCase, LogEntry, ActionType, PageElement, TestReport, Folder as IFolder } from './types.ts';
+import { TestCase, LogEntry, ActionType, PageElement, TestReport, Folder as IFolder, CustomVariable } from './types.ts';
 import { StepEditor } from './components/StepEditor.tsx';
 import { LogConsole } from './components/LogConsole.tsx';
 import { ReportsView } from './components/ReportsView.tsx';
@@ -38,6 +38,7 @@ const App: React.FC = () => {
     const [elementMap, setElementMap] = useState<PageElement[]>([]);
     const [folders, setFolders] = useState<IFolder[]>([]);
     const [selectedTestId, setSelectedTestId] = useState<string>('');
+    const [customVariables, setCustomVariables] = useState<CustomVariable[]>([]);
 
     // Controle de Seleção Múltipla (Checkboxes)
     const [selectedTestIds, setSelectedTestIds] = useState<Set<string>>(new Set());
@@ -142,6 +143,10 @@ const App: React.FC = () => {
                 } catch(e) {
                     console.error("Erro ao carregar relatórios", e);
                 }
+
+                if (data.customVariables) {
+                    setCustomVariables(data.customVariables);
+                }
             } catch (e) {
                 console.error("Erro ao carregar configurações do servidor. Usando padrões.", e);
                 setTestCases([DEFAULT_TEST_CASE]);
@@ -178,7 +183,7 @@ const App: React.FC = () => {
                 await fetch(`${API_URL}/save-config`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ testCases, elementMap, folders, baseUrl })
+                    body: JSON.stringify({ testCases, elementMap, folders, baseUrl, customVariables })
                 });
             } catch (e) {
                 console.error("Erro ao sincronizar com o servidor.");
@@ -186,7 +191,7 @@ const App: React.FC = () => {
         };
         const timeout = setTimeout(saveData, 1000);
         return () => clearTimeout(timeout);
-    }, [testCases, elementMap, folders, baseUrl, isDataLoaded]);
+    }, [testCases, elementMap, folders, baseUrl, customVariables, isDataLoaded]);
 
     // --- Sidebar Resizing Logic ---
     const startResizing = useCallback(() => {
@@ -353,6 +358,26 @@ const App: React.FC = () => {
         setActiveMenuId(null);
     };
 
+    const duplicateSelectedTests = () => {
+        if (selectedTestIds.size === 0) return;
+        
+        const newTests: TestCase[] = [];
+        testCases.forEach(tc => {
+            if (selectedTestIds.has(tc.id)) {
+                newTests.push({
+                    ...tc,
+                    id: crypto.randomUUID(),
+                    name: `${tc.name} (Cópia)`,
+                    steps: tc.steps.map(s => ({...s, id: crypto.randomUUID()}))
+                });
+            }
+        });
+        
+        setTestCases(prev => [...prev, ...newTests]);
+        setActiveMenuId(null);
+        addLog(`${newTests.length} testes duplicados com sucesso.`, 'SUCCESS');
+    };
+
     const createNewFolder = (parentId?: string) => {
         const newFolder: IFolder = {
             id: crypto.randomUUID(),
@@ -429,9 +454,18 @@ const App: React.FC = () => {
         setFolders(prev => prev.map(f => f.id === id ? { ...f, isExpanded: !f.isExpanded } : f));
     };
 
-    const moveTestToFolder = (testId: string, folderId?: string) => {
-        setTestCases(prev => prev.map(tc => tc.id === testId ? { ...tc, folderId } : tc));
+    const moveTestToFolder = (testId: string | 'selection', folderId?: string) => {
+        if (testId === 'selection') {
+            setTestCases(prev => prev.map(tc => 
+                selectedTestIds.has(tc.id) ? { ...tc, folderId } : tc
+            ));
+        } else {
+            setTestCases(prev => prev.map(tc => tc.id === testId ? { ...tc, folderId } : tc));
+        }
         setMoveTestId(null);
+        if (folderId) {
+            setFolders(prev => prev.map(f => f.id === folderId ? {...f, isExpanded: true} : f));
+        }
     };
 
     const updateActiveTest = (updates: Partial<TestCase>) => {
@@ -681,7 +715,7 @@ const App: React.FC = () => {
             const response = await fetch(`${API_URL}/run-test`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ testCase: testCaseWithGlobalUrl, elementMap })
+                body: JSON.stringify({ testCase: testCaseWithGlobalUrl, elementMap, customVariables })
             });
 
             if (!response.body) throw new Error("Sem resposta do servidor.");
@@ -691,35 +725,53 @@ const App: React.FC = () => {
             let buffer = '';
             let finalResult: any = null;
 
+            const processLines = (chunk: string) => {
+                buffer += chunk;
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                    if (!line.trim()) continue;
+                    try {
+                        const event = JSON.parse(line);
+                        if (event.type === 'LOG') {
+                            addLog(event.data.message, event.data.level);
+                        } else if (event.type === 'STEP_END' && event.data.status === 'ERROR') {
+                            addLog(`[ERRO] Passo falhou: ${event.data.error}`, 'ERROR');
+                        } else if (event.type === 'TEST_END') {
+                            finalResult = event.data;
+                        }
+                    } catch(e) {}
+                }
+            };
+
             while (true) {
                 const { done, value } = await reader.read();
                 if (value) {
-                    buffer += decoder.decode(value, { stream: !done });
-                    const lines = buffer.split('\n');
-                    buffer = lines.pop() || '';
-
-                    for (const line of lines) {
-                        if (!line.trim()) continue;
+                    processLines(decoder.decode(value, { stream: true }));
+                }
+                if (done) {
+                    // Flush any leftover data in the buffer that wasn't terminated by '\n'
+                    const leftover = buffer.trim();
+                    if (leftover) {
                         try {
-                            const event = JSON.parse(line);
+                            const event = JSON.parse(leftover);
                             if (event.type === 'LOG') {
                                 addLog(event.data.message, event.data.level);
-                            } else if (event.type === 'STEP_END' && event.data.status === 'ERROR') {
-                                addLog(`[ERRO] Passo falhou: ${event.data.error}`, 'ERROR');
                             } else if (event.type === 'TEST_END') {
                                 finalResult = event.data;
                             }
                         } catch(e) {}
                     }
+                    break;
                 }
-                if (done) break;
             }
 
             const result = finalResult;
             if (!result) throw new Error("Teste finalizado sem resultado ou conexão abortada.");
 
             const newReport: TestReport = {
-                id: crypto.randomUUID(),
+                id: (crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)),
                 testCaseId: testCase.id,
                 testName: testCase.name,
                 timestamp: new Date().toLocaleString('pt-BR'),
@@ -962,7 +1014,7 @@ const App: React.FC = () => {
 
                                 {/* Context Menu for Test */}
                                 {activeMenuId === tc.id && (
-                                    <div className="absolute right-0 top-full mt-1 w-32 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 flex flex-col p-1 animate-in zoom-in-95 duration-200">
+                                    <div className="absolute right-0 top-full mt-1 w-40 bg-slate-800 rounded-xl shadow-xl border border-slate-700 overflow-hidden z-50 flex flex-col p-1 animate-in zoom-in-95 duration-200">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setMoveTestId(tc.id); setActiveMenuId(null); }}
                                             className="flex items-center gap-2 px-3 py-2 text-[10px] font-bold text-slate-300 hover:bg-slate-700 hover:text-white rounded-lg text-left"
@@ -975,6 +1027,24 @@ const App: React.FC = () => {
                                         >
                                             <Copy size={10} /> Duplicar
                                         </button>
+
+                                        {selectedTestIds.size > 1 && selectedTestIds.has(tc.id) && (
+                                            <>
+                                                <div className="h-px bg-slate-700 my-1 mx-2"></div>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); setMoveTestId('selection'); setActiveMenuId(null); }}
+                                                    className="flex items-center gap-2 px-3 py-2 text-[10px] font-black text-blue-400 hover:bg-blue-900/30 rounded-lg text-left"
+                                                >
+                                                    <ArrowRight size={10} /> Mover Todos ({selectedTestIds.size})
+                                                </button>
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); duplicateSelectedTests(); }}
+                                                    className="flex items-center gap-2 px-3 py-2 text-[10px] font-black text-fuchsia-400 hover:bg-fuchsia-900/30 rounded-lg text-left"
+                                                >
+                                                    <Copy size={10} /> Duplicar Todos ({selectedTestIds.size})
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 )}
                             </div>
@@ -1321,11 +1391,12 @@ const App: React.FC = () => {
                                         onUpdateElementMap={setElementMap}
                                         onRequestNewField={(idx) => {
                                             setNewFieldData({ ...newFieldData, stepIndex: idx });
-                                            setIsCreatingNewCategory(false);
                                             setIsNewFieldModalOpen(true);
                                         }}
                                         onEditElement={openEditElementModal}
-                                        onDeleteElement={(name) => setDeleteElementId(name)}
+                                        onDeleteElement={setDeleteElementId}
+                                        customVariables={customVariables}
+                                        onUpdateCustomVariables={setCustomVariables}
                                     />
                                 </div>
                             </>

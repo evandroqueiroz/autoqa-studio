@@ -241,6 +241,8 @@ export const ReportsView: React.FC<ReportsViewProps> = ({ reports, testCases }) 
                                                                     <td className="px-4 py-3">
                                                                         {s.status === 'SUCCESS' ? (
                                                                             <span className="text-emerald-600 font-bold flex items-center gap-1"><CheckCircle size={12} /> OK</span>
+                                                                        ) : s.status === 'SKIPPED' ? (
+                                                                            <span className="text-slate-400 font-bold flex items-center gap-1"><Clock size={12} /> Ignorado</span>
                                                                         ) : (
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-rose-600 font-bold flex items-center gap-1"><XCircle size={12} /> Erro</span>

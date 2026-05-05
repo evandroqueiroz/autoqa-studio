@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    container_name: autoqa_studio
+    restart: always
+    ports:
+      - "3000:3000"
+      - "5173:5173"
+    environment:
+      - MONGO_URL=mongodb://mongo:27017/autoqa
+    depends_on:
+      - mongo
+
+  mongo:
+    image: mongo:4.4
+    container_name: mongo_autoqa
+    restart: always
+    ports:
+      - "27017:27017"

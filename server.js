@@ -8,18 +8,29 @@ app.use(cors());
 app.use(express.json());
 
 // --- Database Configuration ---
-const mongoUrl = 'mongodb://localhost:27017';
+const mongoUrl = process.env.MONGO_URL || 'mongodb://mongo:27017/autoqa';
 const dbName = 'autoqa';
 let db;
 
-async function connectDB() {
-  try {
-    const client = new MongoClient(mongoUrl);
-    await client.connect();
-    db = client.db(dbName);
-    console.log("🚀 Conectado ao MongoDB (autoqa)!");
-  } catch (error) {
-    console.error("❌ Erro ao conectar ao MongoDB:", error);
+async function connectDB(retries = 5) {
+  while (retries > 0) {
+    try {
+      console.log(`Tentando conectar ao MongoDB em: ${mongoUrl.replace(/:([^:@]+)@/, ':****@')}...`);
+      const client = new MongoClient(mongoUrl);
+      await client.connect();
+      db = client.db(dbName);
+      console.log("Conectado ao MongoDB com sucesso!");
+      return;
+    } catch (error) {
+      retries--;
+      console.error(`Erro ao conectar ao MongoDB (${retries} tentativas restantes):`, error.message);
+      if (retries === 0) {
+        console.error("💀 Falha crítica: Não foi possível conectar ao banco de dados após várias tentativas.");
+        process.exit(1);
+      }
+      // Espera 3 segundos antes de tentar novamente
+      await new Promise(res => setTimeout(res, 3000));
+    }
   }
 }
 connectDB();
@@ -38,12 +49,15 @@ let sessionCookies = [];
 
 app.get('/load-config', async (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados ainda não está pronto. Tente novamente em instantes." });
+    }
     const configColl = db.collection('config');
     const testsColl = db.collection('testCases');
 
     let globalData = await configColl.findOne({ _id: 'global' });
     if (!globalData) {
-      globalData = { elementMap: [], folders: [], testOrder: [], baseUrl: '' };
+      globalData = { elementMap: [], folders: [], testOrder: [], baseUrl: '', customVariables: [] };
     }
 
     const loadedTestsCursor = await testsColl.find({});
@@ -72,7 +86,8 @@ app.get('/load-config', async (req, res) => {
       testCases: finalTestCases,
       elementMap: globalData.elementMap || [],
       folders: globalData.folders || [],
-      baseUrl: globalData.baseUrl || '' 
+      baseUrl: globalData.baseUrl || '',
+      customVariables: globalData.customVariables || []
     });
 
   } catch (e) {
@@ -83,13 +98,16 @@ app.get('/load-config', async (req, res) => {
 
 app.post('/save-config', async (req, res) => {
   try {
-    const { testCases, elementMap, folders, baseUrl } = req.body;
+    if (!db) {
+      return res.status(503).json({ error: "Banco de dados ainda não está pronto." });
+    }
+    const { testCases, elementMap, folders, baseUrl, customVariables } = req.body;
     const testOrder = testCases.map(t => t.id);
 
     const configColl = db.collection('config');
     await configColl.updateOne(
       { _id: 'global' },
-      { $set: { elementMap, folders, testOrder, baseUrl } },
+      { $set: { elementMap, folders, testOrder, baseUrl, customVariables: customVariables || [] } },
       { upsert: true }
     );
 
@@ -214,42 +232,56 @@ function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-function processDynamicValue(value) {
+function processDynamicValue(value, customVariables = []) {
   if (!value) return value;
   let finalValue = value;
-
   const now = new Date();
+  const pad = (n) => n.toString().padStart(2, '0');
 
-  if (finalValue.includes('{HOJE}')) {
-    finalValue = finalValue.replace(/{HOJE}/g, getFormattedDate(now));
-  }
-  if (finalValue.includes('{ANO_HOJE}')) {
-    finalValue = finalValue.replace(/{ANO_HOJE}/g, getYear(now));
-  }
-  if (finalValue.includes('{AMANHA}')) {
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    finalValue = finalValue.replace(/{AMANHA}/g, getFormattedDate(tomorrow));
-  }
-  if (finalValue.includes('{ONTEM}')) {
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-    finalValue = finalValue.replace(/{ONTEM}/g, getFormattedDate(yesterday));
-  }
-  if (finalValue.includes('{AGORA}')) {
-    finalValue = finalValue.replace(/{AGORA}/g, getFormattedDateTime(now, true));
-  }
-  if (finalValue.includes('{AGORA_SEM_SEGUNDOS}')) {
-    finalValue = finalValue.replace(/{AGORA_SEM_SEGUNDOS}/g, getFormattedDateTime(now, false));
-  }
-  if (finalValue.includes('{AGORA_REGEX}')) {
-    const datePart = getFormattedDateTime(now, false);
-    const escapedDate = escapeRegExp(datePart);
-    finalValue = finalValue.replace(/{AGORA_REGEX}/g, `REGEX:${escapedDate}:\\d{2}`);
-  }
-  if (finalValue.includes('{ALEATORIO_NUM}')) {
-    const randomNum = Math.floor(1000 + Math.random() * 9000); // Gera entre 1000 e 9999
-    finalValue = finalValue.replace(/{ALEATORIO_NUM}/g, randomNum.toString());
+  // Loop de resolução (máximo 3 níveis para evitar loops infinitos)
+  // Isso permite que uma variável customizada use outra ou use uma do sistema
+  for (let iteration = 0; iteration < 3; iteration++) {
+    const previousValue = finalValue;
+
+    // 1. Variáveis de Sistema
+    if (finalValue.includes('{HOJE}')) finalValue = finalValue.replace(/{HOJE}/g, getFormattedDate(now));
+    if (finalValue.includes('{ANO_HOJE}') || finalValue.includes('{ANO_ATUAL}')) {
+      finalValue = finalValue.replace(/{ANO_HOJE}|{ANO_ATUAL}/g, getYear(now).toString());
+    }
+    if (finalValue.includes('{MES_ATUAL}')) finalValue = finalValue.replace(/{MES_ATUAL}/g, pad(now.getMonth() + 1));
+    if (finalValue.includes('{DIA_ATUAL}')) finalValue = finalValue.replace(/{DIA_ATUAL}/g, pad(now.getDate()));
+    
+    if (finalValue.includes('{AMANHA}')) {
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      finalValue = finalValue.replace(/{AMANHA}/g, getFormattedDate(tomorrow));
+    }
+    if (finalValue.includes('{ONTEM}')) {
+      const yesterday = new Date(now);
+      yesterday.setDate(yesterday.getDate() - 1);
+      finalValue = finalValue.replace(/{ONTEM}/g, getFormattedDate(yesterday));
+    }
+    if (finalValue.includes('{AGORA}')) finalValue = finalValue.replace(/{AGORA}/g, getFormattedDateTime(now, true));
+    if (finalValue.includes('{AGORA_SEM_SEGUNDOS}')) finalValue = finalValue.replace(/{AGORA_SEM_SEGUNDOS}/g, getFormattedDateTime(now, false));
+    
+    if (finalValue.includes('{ALEATORIO_NUM}')) {
+      const randomNum = Math.floor(1000 + Math.random() * 9000);
+      finalValue = finalValue.replace(/{ALEATORIO_NUM}/g, randomNum.toString());
+    }
+
+    // 2. Variáveis Customizadas
+    for (const cv of customVariables) {
+      if (cv.name && cv.value !== undefined) {
+        const token = `{${cv.name.toUpperCase()}}`;
+        if (finalValue.includes(token)) {
+          // Usamos string replacement simples aqui para o valor da variável
+          finalValue = finalValue.split(token).join(cv.value);
+        }
+      }
+    }
+
+    // Se não mudou nada nesta iteração, podemos parar
+    if (finalValue === previousValue) break;
   }
 
   return finalValue;
@@ -401,38 +433,69 @@ async function resilientClick(page, locatorStr, value) {
 
   try {
     if (value == null || value === "") {
-        const count = await locator.count();
-        let clicked = false;
-        
-        for (let i = count - 1; i >= 0; i--) {
-            const el = locator.nth(i);
-            if (await el.isVisible({timeout: 500}).catch(()=>false)) {
-                await el.scrollIntoViewIfNeeded();
-                await el.click();
-                clicked = true;
-                break;
+      const count = await locator.count();
+      let clicked = false;
+
+      if (count > 0) {
+        // Collect visible elements and score them by effective z-index.
+        // The effective z-index is the MAX z-index found in the entire ancestor chain.
+        // A button inside a modal (z-index: 1000) scores 1000 even if the button itself has no z-index.
+        // A button in the background page scores 0 (or whatever its ancestors have).
+        const candidates = [];
+
+        for (let i = 0; i < count; i++) {
+          const el = locator.nth(i);
+          if (!await el.isVisible({ timeout: 500 }).catch(() => false)) continue;
+
+          const zScore = await el.evaluate((node) => {
+            let maxZ = 0;
+            let current = node;
+            while (current && current !== document.documentElement) {
+              const z = parseInt(window.getComputedStyle(current).zIndex, 10);
+              if (!isNaN(z) && z > maxZ) maxZ = z;
+              current = current.parentElement;
             }
+            return maxZ;
+          }).catch(() => 0);
+
+          candidates.push({ index: i, zScore });
+          console.log(`🔍 Elemento [${i}] z-score efetivo: ${zScore}`);
         }
-        
-        if (!clicked) {
-            await locator.first().click();
+
+        if (candidates.length > 0) {
+          // Sort: highest z-index first; ties broken by DOM order (last in DOM wins)
+          candidates.sort((a, b) => b.zScore - a.zScore || b.index - a.index);
+
+          const best = candidates[0];
+          console.log(`🎯 Clique no elemento [${best.index}] (z-score: ${best.zScore})`);
+          const el = locator.nth(best.index);
+          await el.scrollIntoViewIfNeeded();
+          await el.click();
+          clicked = true;
         }
+      }
+
+      if (!clicked) {
+        await locator.first().click();
+      }
     } else {
-        console.log(`🔄 Clique index ${value}`);
-        const el = locator.nth(Number(value));
-        await el.scrollIntoViewIfNeeded();
-        await el.click();
+      console.log(`🔄 Clique index ${value}`);
+      const el = locator.nth(Number(value));
+      await el.scrollIntoViewIfNeeded();
+      await el.click();
     }
   } catch (err) {
     await autoAcceptCookies(page);
     try {
       console.log('🔄 Fallback Javascript click');
       await locator.first().evaluate((node) => node.click());
-    } catch(e2) {
+    } catch (e2) {
       throw err;
     }
   }
 }
+
+
 async function resolveInputLocator(page, locatorStr) {
   const parentLocator = page.locator(locatorStr).first();
   try {
@@ -451,7 +514,7 @@ app.post('/run-test', async (req, res) => {
   });
   const sendEvent = (type, data) => res.write(JSON.stringify({ type, data }) + '\n');
 
-  const { testCase, elementMap } = req.body;
+  const { testCase, elementMap, customVariables } = req.body;
   const startTime = Date.now();
   const stepResults = [];
 
@@ -539,7 +602,7 @@ app.post('/run-test', async (req, res) => {
 
       try {
         const locatorStr = resolveBy(elementInfo, step.selector); // Fallback para selector ad-hoc (nunca o value)
-        const finalValue = processDynamicValue(step.value);
+        const finalValue = processDynamicValue(step.value, customVariables);
         reportValue = finalValue;
 
         switch (step.action) {
@@ -612,7 +675,6 @@ app.post('/run-test', async (req, res) => {
             const startWaitDis = Date.now();
             let isDisabled = false;
             while(Date.now() - startWaitDis < 15000) {
-                // Checa com evaluate para ser ainda mais preciso com bibliotecas antigas (GWT/JSF) que usam readOnly ou property loose
                 const isDis = await locDis.evaluate(node => node.disabled || node.readOnly || node.hasAttribute('disabled')).catch(() => false);
                 if (isDis) {
                     isDisabled = true;
@@ -789,4 +851,4 @@ app.post('/run-test', async (req, res) => {
 });
 
 const PORT = 3000;
-app.listen(PORT, '0.0.0.0',  () => console.log(`🚀 SERVIDOR AUTO-QA PRONTO NA PORTA ${PORT}`));
+app.listen(PORT, '0.0.0.0',  () => console.log(`SERVIDOR AUTO-QA PRONTO NA PORTA ${PORT}`));

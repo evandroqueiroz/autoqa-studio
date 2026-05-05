@@ -69,6 +69,13 @@ export interface PageElement {
   category?: string; 
 }
 
+export interface CustomVariable {
+  id: string;
+  name: string;        // nome da variável sem chaves, ex: "ANO_ATUAL"
+  value: string;       // valor resolvido em tempo de execução
+  description?: string;
+}
+
 export interface StepExecutionResult {
   stepId: string;
   status: 'SUCCESS' | 'ERROR' | 'SKIPPED';

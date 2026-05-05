@@ -1,7 +1,11 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Plus, Trash2, Code2, Pencil, Info, X, GripVertical, Fingerprint, Square, CheckSquare, MoreHorizontal, Clipboard, Copy } from 'lucide-react';
-import { TestStep, ActionType, PageElement, ConditionType } from '../types.ts';
+import { Plus, Trash2, Code2, Pencil, Info, X, GripVertical, Fingerprint, Square, CheckSquare, MoreHorizontal, Clipboard, Copy, ArrowRight } from 'lucide-react';
+import { TestStep, ActionType, PageElement, ConditionType, CustomVariable } from '../types.ts';
+
+const generateUUID = () => {
+    return crypto?.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+};
 
 interface StepEditorProps {
     steps: TestStep[];
@@ -11,6 +15,8 @@ interface StepEditorProps {
     onRequestNewField: (index: number) => void;
     onEditElement: (name: string) => void;
     onDeleteElement: (name: string) => void;
+    customVariables: CustomVariable[];
+    onUpdateCustomVariables: (vars: CustomVariable[]) => void;
 }
 
 export const StepEditor: React.FC<StepEditorProps> = ({
@@ -20,7 +26,9 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                                           onUpdateElementMap,
                                                           onRequestNewField,
                                                           onEditElement,
-                                                          onDeleteElement
+                                                          onDeleteElement,
+                                                          customVariables,
+                                                          onUpdateCustomVariables
                                                       }) => {
 
     const [showHelp, setShowHelp] = useState(false);
@@ -42,6 +50,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
     // Context Menu State
     const [contextMenu, setContextMenu] = useState<{ x: number, y: number, stepIndex: number } | null>(null);
+    const contextMenuRef = useRef<HTMLDivElement>(null);
 
     // Check clipboard on mount
     useEffect(() => {
@@ -64,13 +73,16 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
     // Fecha menu ao clicar fora
     useEffect(() => {
-        const handleClickOutside = () => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (contextMenuRef.current && contextMenuRef.current.contains(e.target as Node)) {
+                return;
+            }
             setOpenMenuId(null);
             setContextMenu(null);
             // Não fechamos o editingValueId aqui pois o onBlur do input já cuida disso
         };
-        document.addEventListener('click', handleClickOutside);
-        return () => document.removeEventListener('click', handleClickOutside);
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
     }, []);
 
     // --- Clipboard Logic ---
@@ -94,7 +106,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
             // Regenerate IDs for pasted steps
             const newSteps = parsed.map(s => ({
                 ...s,
-                id: crypto.randomUUID(),
+                id: generateUUID(),
                 order: 0 // Will be recalculated
             }));
 
@@ -179,7 +191,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
     const addStep = () => {
         const newStep: TestStep = {
-            id: crypto.randomUUID(),
+            id: generateUUID(),
             order: steps.length + 1,
             action: ActionType.TYPE,
             field: '',
@@ -200,7 +212,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
 
     const handleDuplicateStep = (index: number) => {
         const stepToDuplicate = steps[index];
-        const newStep = { ...stepToDuplicate, id: crypto.randomUUID() };
+        const newStep = { ...stepToDuplicate, id: generateUUID() };
         const newSteps = [...steps];
         newSteps.splice(index + 1, 0, newStep);
         const reorderedSteps = newSteps.map((s, i) => ({ ...s, order: i + 1 }));
@@ -366,9 +378,9 @@ export const StepEditor: React.FC<StepEditorProps> = ({
         { label: '', index: 0 }, // Checkbox Column
         { label: '#', index: 1 },
         { label: 'Ação', index: 2 },
-        { label: 'Elemento', index: 3 }, // RENOMEADO
+        { label: 'Elemento', index: 3 },
         { label: 'TID', index: 4 },
-        { label: 'CSS / XPath', index: 5 },
+        // { label: 'CSS / XPath', index: 5 }, // COLUNA OCULTA
         { label: 'Condição', index: 6 },
         { label: 'Valor / Texto', index: 7 },
         { label: 'Atraso (ms)', index: 8 },
@@ -556,8 +568,8 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                                     </div>
                                 </td>
 
-                                {/* COLUNA CSS / XPATH */}
-                                <td className="px-1">
+                                {/* COLUNA CSS / XPATH - OCULTA */}
+                                {/* <td className="px-1">
                                     <div className={`flex items-center gap-2 px-2 py-1 rounded-lg border 
                         ${isWaitAction || !!currentTid
                                         ? 'bg-slate-100/50 border-transparent opacity-50'
@@ -573,7 +585,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                              ${(isWaitAction || !!currentTid) ? 'cursor-not-allowed text-slate-400' : 'text-slate-500 focus:text-blue-600'}`}
                                         />
                                     </div>
-                                </td>
+                                </td> */}
 
                                 {/* Condição */}
                                 <td className="px-1">
@@ -650,36 +662,123 @@ export const StepEditor: React.FC<StepEditorProps> = ({
                     <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95">
                         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                             <div>
-                                <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Variáveis</h3>
+                                <h3 className="text-lg font-black text-slate-800 uppercase tracking-widest">Variáveis do Sistema</h3>
                                 <p className="text-xs text-slate-500">Use estes códigos no campo "Valor" para gerar dados dinâmicos.</p>
                             </div>
                             <button onClick={() => setShowHelp(false)} className="p-2 hover:bg-slate-200 rounded-full text-slate-500"><X size={20}/></button>
                         </div>
-                        <div className="flex-1 overflow-y-auto p-6">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {[
-                                    { code: '{HOJE}', desc: 'Data atual no formato DD/MM/AAAA' },
-                                    { code: '{AMANHA}', desc: 'Data de amanhã (D+1) DD/MM/AAAA' },
-                                    { code: '{ONTEM}', desc: 'Data de ontem (D-1) DD/MM/AAAA' },
-                                    { code: '{AGORA}', desc: 'Data e hora atual com segundos' },
-                                    { code: '{AGORA_SEM_SEGUNDOS}', desc: 'Data e hora atual sem segundos' },
-                                    { code: '{AGORA_REGEX}', desc: 'Gera um Regex para o minuto atual (útil para validações)' },
-                                    { code: '{ALEATORIO_NUM}', desc: 'Gera 4 dígitos aleatórios (Ex: 5821)' },
-                                    { code: '{CLEAR}', desc: 'Limpar o campo'},
-                                    { code: '{ENTER}', desc: 'Enter'},
-                                    { code: '{SPACE}', desc: 'Espaço'},
-                                    { code: '{UP}', desc: 'Up'},
-                                    { code: '{DOWN}', desc: 'Down'},
-                                    { code: '{LEFT}', desc: 'Left'},
-                                    { code: '{RIGHT}', desc: 'Right'},
-                                    { code: '{TAB}', desc: 'Tab'},
-                                ].map(item => (
-                                    <div key={item.code} className="p-4 bg-slate-50 rounded-xl border border-slate-100 hover:border-blue-200 transition-colors">
-                                        <code className="text-blue-600 font-bold text-sm bg-blue-50 px-2 py-1 rounded">{item.code}</code>
-                                        <p className="text-xs text-slate-500 mt-2 font-medium">{item.desc}</p>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="flex-1 overflow-y-auto p-6 space-y-8">
+                            {/* Variáveis Nativas */}
+                            <section>
+                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Padrão do Sistema</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {[
+                                        { code: '{HOJE}', desc: 'Data atual DD/MM/AAAA' },
+                                        { code: '{ANO_ATUAL}', desc: 'Ano atual (Ex: 2026)' },
+                                        { code: '{MES_ATUAL}', desc: 'Mês atual (Ex: 05)' },
+                                        { code: '{DIA_ATUAL}', desc: 'Dia atual (Ex: 05)' },
+                                        { code: '{AMANHA}', desc: 'Data de amanhã (D+1)' },
+                                        { code: '{ONTEM}', desc: 'Data de ontem (D-1)' },
+                                        { code: '{AGORA}', desc: 'Data e hora com segundos' },
+                                        { code: '{ALEATORIO_NUM}', desc: '4 dígitos aleatórios' },
+                                        { code: '{CLEAR}', desc: 'Limpar campo' },
+                                        { code: '{ENTER}', desc: 'Tecla Enter' },
+                                        { code: '{TAB}', desc: 'Tecla Tab' },
+                                    ].map(item => (
+                                        <div key={item.code} className="p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-center justify-between">
+                                            <div className="flex flex-col">
+                                                <code className="text-blue-600 font-bold text-xs">{item.code}</code>
+                                                <span className="text-[10px] text-slate-500">{item.desc}</span>
+                                            </div>
+                                            <button 
+                                                onClick={() => {
+                                                    navigator.clipboard.writeText(item.code);
+                                                    // Opcional: feedback de copiado
+                                                }}
+                                                className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-white rounded-lg transition-all"
+                                                title="Copiar código"
+                                            >
+                                                <Copy size={14} />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+
+                            {/* Variáveis Customizadas */}
+                            <section className="pt-4 border-t border-slate-100">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Suas Variáveis</h4>
+                                    <button 
+                                        onClick={() => {
+                                            const newVar = { id: crypto.randomUUID(), name: 'NOVA_VAR', value: 'valor' };
+                                            onUpdateCustomVariables([...customVariables, newVar]);
+                                        }}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black text-white bg-fuchsia-600 rounded-lg hover:bg-fuchsia-700 transition-colors shadow-lg shadow-fuchsia-500/20"
+                                    >
+                                        <Plus size={12} strokeWidth={3} /> Criar Variável
+                                    </button>
+                                </div>
+
+                                <div className="space-y-2">
+                                    {customVariables.length === 0 ? (
+                                        <div className="text-center py-8 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                                            <p className="text-xs font-bold text-slate-400 italic">Nenhuma variável customizada criada.</p>
+                                        </div>
+                                    ) : (
+                                        customVariables.map((cv, idx) => (
+                                            <div key={cv.id} className="p-3 bg-white border border-slate-200 rounded-xl flex items-center gap-3 group">
+                                                <div className="flex-1 flex items-center gap-2">
+                                                    <span className="text-fuchsia-600 font-black text-xs">{"{"}</span>
+                                                    <input 
+                                                        value={cv.name}
+                                                        onChange={(e) => {
+                                                            const newVars = [...customVariables];
+                                                            newVars[idx] = { ...cv, name: e.target.value.toUpperCase().replace(/\s/g, '_') };
+                                                            onUpdateCustomVariables(newVars);
+                                                        }}
+                                                        placeholder="NOME"
+                                                        className="w-32 bg-fuchsia-50 text-fuchsia-700 font-bold text-xs px-2 py-1 rounded-md outline-none focus:ring-2 focus:ring-fuchsia-200"
+                                                    />
+                                                    <span className="text-fuchsia-600 font-black text-xs">{"}"}</span>
+                                                    
+                                                    <ArrowRight size={14} className="text-slate-300" />
+                                                    
+                                                    <input 
+                                                        value={cv.value}
+                                                        onChange={(e) => {
+                                                            const newVars = [...customVariables];
+                                                            newVars[idx] = { ...cv, value: e.target.value };
+                                                            onUpdateCustomVariables(newVars);
+                                                        }}
+                                                        placeholder="Valor..."
+                                                        className="flex-1 bg-slate-50 text-slate-700 font-medium text-xs px-2 py-1 rounded-md outline-none focus:ring-2 focus:ring-blue-100"
+                                                    />
+                                                </div>
+                                                
+                                                <div className="flex items-center gap-1">
+                                                    <button 
+                                                        onClick={() => navigator.clipboard.writeText(`{${cv.name}}`)}
+                                                        className="p-1.5 text-slate-400 hover:text-blue-500 hover:bg-slate-100 rounded-lg transition-all"
+                                                        title="Copiar código"
+                                                    >
+                                                        <Copy size={14} />
+                                                    </button>
+                                                    <button 
+                                                        onClick={() => {
+                                                            onUpdateCustomVariables(customVariables.filter(v => v.id !== cv.id));
+                                                        }}
+                                                        className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                        title="Excluir"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </section>
                         </div>
                     </div>
                 </div>
@@ -688,6 +787,7 @@ export const StepEditor: React.FC<StepEditorProps> = ({
             {/* Context Menu Modal */}
             {contextMenu && (
                 <div 
+                    ref={contextMenuRef}
                     className="fixed z-[100] bg-white rounded-xl shadow-xl border border-slate-100 py-1 w-32 animate-in zoom-in-95"
                     style={{ top: contextMenu.y, left: contextMenu.x }}
                     onClick={(e) => e.stopPropagation()} 
